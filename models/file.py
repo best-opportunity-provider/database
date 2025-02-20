@@ -41,14 +41,21 @@ class File(mongo.Document):
         S3_UPLOAD_ERROR = 1
 
     @classmethod
-    def create(cls, minio_client: minio.Minio, file: BinaryIO, size: int, extension: str,
-               access_mode: AccessMode = AccessMode.PRIVATE,
-               owner: mongo.fields.ObjectId | None = None,
-               bucket: str = 'file') -> Self | CreateError:
+    def create(
+        cls,
+        minio_client: minio.Minio,
+        file: BinaryIO,
+        size: int,
+        extension: str,
+        access_mode: AccessMode = AccessMode.PRIVATE,
+        owner: mongo.fields.ObjectId | None = None,
+        bucket: str = 'file',
+    ) -> Self | CreateError:
         if not re.match(cls.FILE_EXTENSION_REGEX, extension):
             return cls.CreateError.INVALID_EXTENSION
-        instance = File(extension=extension, access_mode=access_mode,
-                        state=cls.State.ALIVE, bucket=bucket)
+        instance = File(
+            extension=extension, access_mode=access_mode, state=cls.State.ALIVE, bucket=bucket
+        )
         if owner is not None:
             instance.owner = owner
         instance: File = instance.save()
@@ -62,17 +69,18 @@ class File(mongo.Document):
     def mark_for_deletion(self) -> None:
         """Marks file for deletion. After call file is considered to be deleted.
 
-           Actual call alters only MongoDB state and is not instantly observable from S3 perspective, 
-           because actual deletion is handled by separate worker.
+        Actual call alters only MongoDB state and is not instantly observable from S3 perspective,
+        because actual deletion is handled by separate worker.
         """
 
         self.state = self.State.MARKED_FOR_DELETION
         self.save()
 
-    class DeleteError(IntEnum):
-        ...
+    class DeleteError(IntEnum): ...
 
-    def handle_deletion(self, minio_client: minio.Minio, bucket: str = 'file') -> None | DeleteError:
+    def handle_deletion(
+        self, minio_client: minio.Minio, bucket: str = 'file'
+    ) -> None | DeleteError:
         # TODO: this needs documentation
         # Thing must rely on bucket versioning, although I don't know details yet
         ...

@@ -2,7 +2,7 @@ from enum import IntEnum
 import mongoengine as mongo
 
 from .file import File
-from .trans_string import TransStringData
+from .trans_string import Language, TransStringData
 from .geo import Country, City
 
 
@@ -20,7 +20,7 @@ class OpportunityFieldOfStudy(mongo.Document):
         'collection': 'opportunity_field_of_study',
     }
 
-    # Must be provided in all languages, preffered language is not present
+    # Must be provided in all languages, fallback language is not present
     name = mongo.EmbeddedDocumentField(TransStringData, required=True)
 
 
@@ -29,7 +29,7 @@ class OpportunityTag(mongo.Document):
         'collection': 'opportunity_tag',
     }
 
-    # Must be provided in all languages, preffered language is not present
+    # Must be provided in all languages, fallback language is not present
     name = mongo.EmbeddedDocumentField(TransStringData, required=True)
 
 
@@ -48,11 +48,16 @@ class Opportunity(mongo.Document):
         'collection': 'opportunity',
     }
 
+    fallback_language = mongo.EnumField(Language, required=True)
+    # fallback language is obsolete, because of respective document field
     name = mongo.EmbeddedDocumentField(TransStringData, required=True)
     source = mongo.EmbeddedDocumentField(OpportunitySource, required=True)
-    provider = mongo.LazyReferenceField(OpportunityProvider, required=True,
-                                        reverse_delete_rule=mongo.DENY)
-    field_of_study = mongo.LazyReferenceField(OpportunityFieldOfStudy, reverse_delete_rule=mongo.DENY)
+    provider = mongo.LazyReferenceField(
+        OpportunityProvider, required=True, reverse_delete_rule=mongo.DENY
+    )
+    field_of_study = mongo.LazyReferenceField(
+        OpportunityFieldOfStudy, reverse_delete_rule=mongo.DENY
+    )
     tags = mongo.ListField(mongo.LazyReferenceField(OpportunityTag, reverse_delete_rule=mongo.DENY))
     countries = mongo.ListField(mongo.LazyReferenceField(Country, reverse_delete_rule=mongo.DENY))
     cities = mongo.ListField(mongo.LazyReferenceField(City, reverse_delete_rule=mongo.DENY))

@@ -12,8 +12,8 @@ class Country(mongo.Document):
 
     # Must be provided in all languages, preffered language is not present
     name = mongo.EmbeddedDocumentField(TransStringData, required=True)
-    emoji = mongo.StringField()
-    phone_code = mongo.StringField(regex=PHONE_CODE_REGEX)
+    emoji = mongo.StringField(required=True)
+    phone_code = mongo.StringField(regex=PHONE_CODE_REGEX, required=True)
 
 
 class City(mongo.Document):
@@ -21,7 +21,9 @@ class City(mongo.Document):
         'collection': 'city',
     }
 
-    country = mongo.LazyReferenceField(Country, required=True,
-                                       reverse_delete_rule=mongo.CASCADE)
+    country = mongo.LazyReferenceField(Country, required=True, reverse_delete_rule=mongo.DENY)
     # Must be provided in all languages, preffered language is not present
     name = mongo.EmbeddedDocumentField(TransStringData, required=True)
+
+
+class Place(mongo.Document): ...  # TODO: interesting idea to consider (instead of exact addresses)
