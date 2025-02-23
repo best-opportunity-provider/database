@@ -1,6 +1,9 @@
 import mongoengine as mongo
 
-from .trans_string import TransStringData
+from .trans_string.embedded import (
+    TransString,
+    ContainedPartialTransString,
+)
 
 
 class Country(mongo.Document):
@@ -8,12 +11,11 @@ class Country(mongo.Document):
         'collection': 'country',
     }
 
-    PHONE_CODE_REGEX = r'\d{1,3}'
+    PHONE_CODE_REGEX = r'\+?\d{1,3}'
 
-    # Must be provided in all languages, preffered language is not present
-    name = mongo.EmbeddedDocumentField(TransStringData, required=True)
-    emoji = mongo.StringField(required=True)
+    name = mongo.EmbeddedDocumentField(TransString, required=True)
     phone_code = mongo.StringField(regex=PHONE_CODE_REGEX, required=True)
+    flag_emoji = mongo.StringField(required=True)
 
 
 class City(mongo.Document):
@@ -22,8 +24,14 @@ class City(mongo.Document):
     }
 
     country = mongo.LazyReferenceField(Country, required=True, reverse_delete_rule=mongo.DENY)
-    # Must be provided in all languages, preffered language is not present
-    name = mongo.EmbeddedDocumentField(TransStringData, required=True)
+    name = mongo.EmbeddedDocumentField(TransString, required=True)
 
 
-class Place(mongo.Document): ...  # TODO: interesting idea to consider (instead of exact addresses)
+class Place(mongo.Document):
+    meta = {
+        'collection': 'place',
+    }
+
+    name = mongo.EmbeddedDocumentField(ContainedPartialTransString, required=True)
+    country = mongo.LazyReferenceField(Country, reverse_delete_rule=mongo.DENY)
+    city = mongo.LazyReferenceField(City, reverse_delete_rule=mongo.DENY)

@@ -10,8 +10,6 @@ class File(mongo.Document):
         'collection': 'file',
     }
 
-    FILE_EXTENSION_REGEX = r'^[A-Za-z]+(.[A-Za-z]+)*$'
-
     class AccessMode(IntEnum):
         PRIVATE = 0
         PUBLIC = 1
@@ -20,13 +18,20 @@ class File(mongo.Document):
         ALIVE = 0
         MARKED_FOR_DELETION = 1
 
+    class Bucket(IntEnum):
+        USER_AVATAR = 0
+        PROVIDER_LOGO = 1
+
+    FILE_EXTENSION_REGEX = r'^[A-Za-z]+(.[A-Za-z]+)*$'
+    BUCKET_NAMES = {
+        Bucket.USER_AVATAR: 'user_avatar',
+        Bucket.PROVIDER_LOGO: 'opportunity_provider_logo',
+    }
+
     extension = mongo.StringField(regex=FILE_EXTENSION_REGEX, required=True)
-    # We allow arbitrary objects to own files, so `File` knows nothing about its owner.
-    # This means, that the files must be deleted on the owner side and won't be cascaded automatically.
-    owner = mongo.GenericLazyReferenceField()
     access_mode = mongo.EnumField(AccessMode, required=True)
     state = mongo.EnumField(State, required=True)
-    bucket = mongo.StringField()  # If not specified, 'file' is used
+    bucket = mongo.EnumField(Bucket, required=True)
 
     @classmethod
     def get_name(cls, object_id: mongo.fields.ObjectId, extension: str) -> str:
@@ -47,18 +52,17 @@ class File(mongo.Document):
         file: BinaryIO,
         size: int,
         extension: str,
+        bucket: Bucket,
         access_mode: AccessMode = AccessMode.PRIVATE,
-        owner: mongo.fields.ObjectId | None = None,
-        bucket: str = 'file',
     ) -> Self | CreateError:
         if not re.match(cls.FILE_EXTENSION_REGEX, extension):
             return cls.CreateError.INVALID_EXTENSION
-        instance = File(
-            extension=extension, access_mode=access_mode, state=cls.State.ALIVE, bucket=bucket
-        )
-        if owner is not None:
-            instance.owner = owner
-        instance: File = instance.save()
+        instance: File = File(
+            extension=extension,
+            access_mode=access_mode,
+            state=cls.State.ALIVE,
+            bucket=bucket,
+        ).save()
         try:
             minio_client.put_object(bucket, cls.get_name(instance.pk, extension), file, size)
         except minio.S3Error:
@@ -79,7 +83,8 @@ class File(mongo.Document):
     class DeleteError(IntEnum): ...
 
     def handle_deletion(
-        self, minio_client: minio.Minio, bucket: str = 'file'
+        self,
+        minio_client: minio.Minio,
     ) -> None | DeleteError:
         # TODO: this needs documentation
         # Thing must rely on bucket versioning, although I don't know details yet
