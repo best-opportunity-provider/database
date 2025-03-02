@@ -10,8 +10,6 @@ from .trans_string.embedded import (
     ContainedPartialTransString,
 )
 from .geo import (
-    Country,
-    City,
     Place,
 )
 
@@ -25,9 +23,9 @@ class OpportunityProvider(mongo.Document):
     logo = mongo.LazyReferenceField(File, reverse_delete_rule=mongo.NULLIFY)
 
 
-class OpportunityFieldOfStudy(mongo.Document):
+class OpportunityIndustry(mongo.Document):
     meta = {
-        'collection': 'opportunity_field_of_study',
+        'collection': 'opportunity_industry',
     }
 
     name = mongo.EmbeddedDocumentField(ContainedPartialTransString, required=True)
@@ -36,6 +34,14 @@ class OpportunityFieldOfStudy(mongo.Document):
 class OpportunityTag(mongo.Document):
     meta = {
         'collection': 'opportunity_tag',
+    }
+
+    name = mongo.EmbeddedDocumentField(ContainedPartialTransString, required=True)
+
+
+class OpportunityLanguage(mongo.Document):
+    meta = {
+        'collection': 'opportunity_language',
     }
 
     name = mongo.EmbeddedDocumentField(ContainedPartialTransString, required=True)
@@ -64,6 +70,7 @@ class Opportunity(mongo.Document):
         'collection': 'opportunity',
     }
 
+    translations = mongo.ListField(mongo.EnumField(Language), required=True)
     fallback_language = mongo.EnumField(Language, required=True)
     name = mongo.EmbeddedDocumentField(PartialTransString, required=True)
     short_description = mongo.EmbeddedDocumentField(PartialTransString, required=True)
@@ -73,15 +80,16 @@ class Opportunity(mongo.Document):
         reverse_delete_rule=mongo.DENY,
         required=True,
     )
-    field_of_study = mongo.LazyReferenceField(
-        OpportunityFieldOfStudy,
+    industry = mongo.LazyReferenceField(
+        OpportunityIndustry,
         reverse_delete_rule=mongo.DENY,
         required=True,
     )
     tags = mongo.ListField(mongo.LazyReferenceField(OpportunityTag, reverse_delete_rule=mongo.DENY))
+    languages = mongo.ListField(
+        mongo.LazyReferenceField(OpportunityLanguage, reverse_delete_rule=mongo.DENY)
+    )
     places = mongo.ListField(mongo.LazyReferenceField(Place, reverse_delete_rule=mongo.DENY))
-    countries = mongo.ListField(mongo.LazyReferenceField(Country, reverse_delete_rule=mongo.DENY))
-    cities = mongo.ListField(mongo.LazyReferenceField(City, reverse_delete_rule=mongo.DENY))
     sections = mongo.ListField(
         mongo.LazyReferenceField(OpportunitySection, reverse_delete_rule=mongo.NULLIFY)
     )
