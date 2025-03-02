@@ -50,9 +50,9 @@ class File(mongo.Document):
         cls,
         minio_client: minio.Minio,
         file: BinaryIO,
-        size: int,
         extension: str,
         bucket: Bucket,
+        size: int | None = None,
         access_mode: AccessMode = AccessMode.PRIVATE,
     ) -> Self | CreateError:
         if not re.match(cls.FILE_EXTENSION_REGEX, extension):
@@ -64,7 +64,13 @@ class File(mongo.Document):
             bucket=bucket,
         ).save()
         try:
-            minio_client.put_object(bucket, cls.get_name(instance.pk, extension), file, size)
+            minio_client.put_object(
+                bucket,
+                cls.get_name(instance.pk, extension),
+                file,
+                size if size is not None else -1,
+                part_size=5_242_880,
+            )
         except minio.S3Error:
             instance.delete()
             return cls.CreateError.S3_UPLOAD_ERROR
