@@ -28,7 +28,7 @@ class APIKey(mongo.Document):
     def generate_key(cls, salt: str) -> str:
         from hashlib import sha256
 
-        return sha256(f'{datetime.now()}{salt}'.encode())[:64]
+        return sha256(f'{datetime.now()}{salt}'.encode()).hexdigest()[:64]
 
     @classmethod
     def get(cls, full_key: str) -> Self | None:
