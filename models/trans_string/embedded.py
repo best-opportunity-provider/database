@@ -1,3 +1,4 @@
+from typing import Self
 from enum import StrEnum
 import mongoengine as mongo
 
@@ -31,3 +32,9 @@ class ContainedPartialTransString(PartialTransString):
     and stores fallback language."""
 
     fallback_language = mongo.EnumField(Language, required=True)
+
+    @classmethod
+    def create(cls, text: str, language: Language) -> Self:
+        self = ContainedPartialTransString(fallback_language=language)
+        setattr(self, language.value, text)
+        return self

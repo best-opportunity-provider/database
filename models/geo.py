@@ -1,8 +1,10 @@
+from typing import Self
 import mongoengine as mongo
 
 from .trans_string.embedded import (
     TransString,
     ContainedPartialTransString,
+    Language,
 )
 
 
@@ -35,3 +37,17 @@ class Place(mongo.Document):
     name = mongo.EmbeddedDocumentField(ContainedPartialTransString, required=True)
     country = mongo.LazyReferenceField(Country, reverse_delete_rule=mongo.DENY)
     city = mongo.LazyReferenceField(City, reverse_delete_rule=mongo.DENY)
+
+    @classmethod
+    def create(
+        cls,
+        name: str,
+        language: Language,
+        location: Country | City | None = None,
+    ) -> Self:
+        self = Place(name=ContainedPartialTransString.create(name, language))
+        if isinstance(location, Country):
+            self.country = location
+        elif isinstance(location, City):
+            self.city = location
+        return self.save()
