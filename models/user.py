@@ -1,6 +1,4 @@
-from typing import Annotated
 import mongoengine as mongo
-import pydantic
 
 from .file import File
 
@@ -29,16 +27,3 @@ class UserInfo(mongo.Document):
     name = mongo.StringField()
     surname = mongo.StringField()
     birthday = mongo.DateField()
-
-
-class LoginCredentialsModel(pydantic.BaseModel):
-    model_config = pydantic.ConfigDict(
-        extra='ignore',
-    )
-
-    username: Annotated[str, pydantic.Field(pattern=User.USERNAME_REGEX)]
-    password: Annotated[str, pydantic.Field(pattern=User.PASSWORD_REGEX)]
-
-
-class RegistrationCredentialsModel(LoginCredentialsModel):
-    email: Annotated[str, pydantic.Field(pattern=User.EMAIL_REGEX)]

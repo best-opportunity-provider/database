@@ -1,15 +1,15 @@
 from enum import IntEnum
 import mongoengine as mongo
 
-from .file import File
-from .trans_string import (
+from ..file import File
+from ..trans_string import (
     Language,
 )
-from .trans_string.embedded import (
+from ..trans_string.embedded import (
     PartialTransString,
     ContainedPartialTransString,
 )
-from .geo import (
+from ..geo import (
     Place,
 )
 
