@@ -26,6 +26,11 @@ class PartialTransString(mongo.EmbeddedDocument):
     en = mongo.StringField()
     ru = mongo.StringField()
 
+    def matches(self, regex: str) -> bool:
+        import re
+
+        return any(re.match(regex, field) for field in (self.en, self.ru) if field is not None)
+
 
 class ContainedPartialTransString(PartialTransString):
     """String, that provides translations to a subset of supported languages

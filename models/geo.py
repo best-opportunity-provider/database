@@ -1,10 +1,12 @@
 from typing import Self
 import mongoengine as mongo
 
+from .trans_string import (
+    Language,
+)
 from .trans_string.embedded import (
     TransString,
     ContainedPartialTransString,
-    Language,
 )
 
 

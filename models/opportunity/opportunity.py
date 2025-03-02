@@ -1,3 +1,4 @@
+from typing import Self
 from enum import IntEnum
 import mongoengine as mongo
 
@@ -22,6 +23,10 @@ class OpportunityProvider(mongo.Document):
     name = mongo.EmbeddedDocumentField(ContainedPartialTransString, required=True)
     logo = mongo.LazyReferenceField(File, reverse_delete_rule=mongo.NULLIFY)
 
+    @classmethod
+    def get_all(cls, regex: str = '*') -> list[Self]:
+        return [provider for provider in cls.objects if provider.name.matches(regex)]
+
 
 class OpportunityIndustry(mongo.Document):
     meta = {
@@ -29,6 +34,10 @@ class OpportunityIndustry(mongo.Document):
     }
 
     name = mongo.EmbeddedDocumentField(ContainedPartialTransString, required=True)
+
+    @classmethod
+    def get_all(cls) -> list[Self]:
+        return [industry for industry in cls.objects]
 
 
 class OpportunityTag(mongo.Document):
@@ -38,6 +47,10 @@ class OpportunityTag(mongo.Document):
 
     name = mongo.EmbeddedDocumentField(ContainedPartialTransString, required=True)
 
+    @classmethod
+    def get_all(cls) -> list[Self]:
+        return [tag for tag in cls.objects]
+
 
 class OpportunityLanguage(mongo.Document):
     meta = {
@@ -45,6 +58,10 @@ class OpportunityLanguage(mongo.Document):
     }
 
     name = mongo.EmbeddedDocumentField(ContainedPartialTransString, required=True)
+
+    @classmethod
+    def get_all(cls) -> list[Self]:
+        return [language for language in cls.objects]
 
 
 class OpportunitySource(mongo.EmbeddedDocument):

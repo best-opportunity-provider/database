@@ -87,8 +87,6 @@ class DateField(FormField):
     class Fill(IntEnum):
         BIRTHDAY = 0
 
-    min = mongo.DateField()
-    max = mongo.DateField()
     fill = mongo.EnumField(Fill)
 
 
