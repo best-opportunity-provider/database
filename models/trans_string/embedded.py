@@ -26,6 +26,18 @@ class PartialTransString(mongo.EmbeddedDocument):
     en = mongo.StringField()
     ru = mongo.StringField()
 
+    def get_translation(self, language: Language) -> str | None:
+        return getattr(self, language.value, None)
+
+    def has_translation(self, language: Language) -> bool:
+        return self.get_translation(language) is not None
+
+    def try_get_translation(self, fallback_language: Language, preferred_language: Language) -> str:
+        assert self.has_translation(fallback_language)
+        if (preferred := self.get_translation(preferred_language)) is not None:
+            return preferred
+        return self.get_translation(fallback_language)
+
     def matches(self, regex: str) -> bool:
         import re
 
