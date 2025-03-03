@@ -9,13 +9,6 @@ class Language(StrEnum):
 
 
 class TransString(mongo.EmbeddedDocument):
-    """String, that provides translations to all supported languages."""
-
-    en = mongo.StringField(required=True)
-    ru = mongo.StringField(required=True)
-
-
-class PartialTransString(mongo.EmbeddedDocument):
     """String, that provides translations to a subset of supported languages.
     Relies on an external source to store fallback language."""
 
@@ -44,7 +37,7 @@ class PartialTransString(mongo.EmbeddedDocument):
         return any(re.match(regex, field) for field in (self.en, self.ru) if field is not None)
 
 
-class ContainedPartialTransString(PartialTransString):
+class ContainedTransString(TransString):
     """String, that provides translations to a subset of supported languages
     and stores fallback language."""
 
@@ -52,6 +45,6 @@ class ContainedPartialTransString(PartialTransString):
 
     @classmethod
     def create(cls, text: str, language: Language) -> Self:
-        self = ContainedPartialTransString(fallback_language=language)
+        self = ContainedTransString(fallback_language=language)
         setattr(self, language.value, text)
         return self

@@ -7,8 +7,8 @@ from ..trans_string import (
     Language,
 )
 from ..trans_string.embedded import (
-    PartialTransString,
-    ContainedPartialTransString,
+    TransString,
+    ContainedTransString,
 )
 from ..geo import (
     Place,
@@ -20,7 +20,7 @@ class OpportunityProvider(mongo.Document):
         'collection': 'opportunity_provider',
     }
 
-    name = mongo.EmbeddedDocumentField(ContainedPartialTransString, required=True)
+    name = mongo.EmbeddedDocumentField(ContainedTransString, required=True)
     logo = mongo.LazyReferenceField(File, reverse_delete_rule=mongo.NULLIFY)
 
     @classmethod
@@ -33,11 +33,11 @@ class OpportunityIndustry(mongo.Document):
         'collection': 'opportunity_industry',
     }
 
-    name = mongo.EmbeddedDocumentField(ContainedPartialTransString, required=True)
+    name = mongo.EmbeddedDocumentField(ContainedTransString, required=True)
 
     @classmethod
     def get_all(cls) -> list[Self]:
-        return [industry for industry in cls.objects]
+        return list(cls.objects)
 
 
 class OpportunityTag(mongo.Document):
@@ -45,11 +45,11 @@ class OpportunityTag(mongo.Document):
         'collection': 'opportunity_tag',
     }
 
-    name = mongo.EmbeddedDocumentField(ContainedPartialTransString, required=True)
+    name = mongo.EmbeddedDocumentField(ContainedTransString, required=True)
 
     @classmethod
     def get_all(cls) -> list[Self]:
-        return [tag for tag in cls.objects]
+        return list(cls.objects)
 
 
 class OpportunityLanguage(mongo.Document):
@@ -57,11 +57,11 @@ class OpportunityLanguage(mongo.Document):
         'collection': 'opportunity_language',
     }
 
-    name = mongo.EmbeddedDocumentField(ContainedPartialTransString, required=True)
+    name = mongo.EmbeddedDocumentField(ContainedTransString, required=True)
 
     @classmethod
     def get_all(cls) -> list[Self]:
-        return [language for language in cls.objects]
+        return list(cls.objects)
 
 
 class OpportunitySource(mongo.EmbeddedDocument):
@@ -89,8 +89,8 @@ class Opportunity(mongo.Document):
 
     translations = mongo.ListField(mongo.EnumField(Language), required=True)
     fallback_language = mongo.EnumField(Language, required=True)
-    name = mongo.EmbeddedDocumentField(PartialTransString, required=True)
-    short_description = mongo.EmbeddedDocumentField(PartialTransString, required=True)
+    name = mongo.EmbeddedDocumentField(TransString, required=True)
+    short_description = mongo.EmbeddedDocumentField(TransString, required=True)
     source = mongo.EmbeddedDocumentField(OpportunitySource, required=True)
     provider = mongo.LazyReferenceField(
         OpportunityProvider,

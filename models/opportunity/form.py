@@ -2,8 +2,8 @@ from enum import IntEnum
 import mongoengine as mongo
 
 from ..trans_string.embedded import (
-    PartialTransString,
-    ContainedPartialTransString,
+    TransString,
+    ContainedTransString,
 )
 from ..geo import (
     Country,
@@ -32,7 +32,7 @@ class FormField(mongo.EmbeddedDocument):
         'allow_inheritance': True,
     }
 
-    label = mongo.EmbeddedDocumentField(PartialTransString, required=True)
+    label = mongo.EmbeddedDocumentField(TransString, required=True)
     is_required = mongo.BooleanField(required=True)
 
 
@@ -63,7 +63,7 @@ class PhoneNumberField(FormField):
 
 
 class ChoiceField(FormField):
-    choices = mongo.MapField(ContainedPartialTransString, required=True)
+    choices = mongo.MapField(ContainedTransString, required=True)
 
 
 class FileField(FormField):
