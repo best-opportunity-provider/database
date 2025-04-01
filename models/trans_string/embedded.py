@@ -44,6 +44,7 @@ class TransString(mongo.EmbeddedDocument):
         setattr(self, language.value, text)
         return self
 
+
 class TransStringModel(pydantic.BaseModel):
     model_config = {
         'extra': 'ignore',
@@ -51,6 +52,7 @@ class TransStringModel(pydantic.BaseModel):
 
     en: str
     ru: str
+
 
 class ContainedTransString(TransString):
     """String, that provides translations to a subset of supported languages

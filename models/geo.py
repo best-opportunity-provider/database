@@ -29,6 +29,7 @@ class Country(mongo.Document):
     def get_all(cls) -> list[Self]:
         return list(cls.objects)
 
+
 class CountryModel(pydantic.BaseModel):
     model_config = {
         'extra': 'ignore',
@@ -54,7 +55,7 @@ class City(mongo.Document):
 
     country = mongo.LazyReferenceField(Country, required=True, reverse_delete_rule=mongo.DENY)
     name = mongo.EmbeddedDocumentField(ContainedTransString, required=True)
-    
+
     @classmethod
     def get_all(cls, regex: str = '*') -> list[Self]:
         return [city for city in cls.objects if city.name.matches(regex)]
@@ -67,6 +68,7 @@ class CityModel(pydantic.BaseModel):
 
     country: CountryModel
     name: ContainedTransStringModel
+
 
 class Place(mongo.Document):
     meta = {
@@ -108,6 +110,7 @@ class Place(mongo.Document):
             self.city = location
             self.country = location.fetch().country
         return self.save()
+
 
 class PlaceModel(pydantic.BaseModel):
     model_config = {

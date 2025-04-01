@@ -107,6 +107,7 @@ class File(mongo.Document):
                 return self.owner_id == accessor_id
         raise NotImplementedError('Unhandled `File.AccessMode`')
 
+
 class FileModel(pydantic.BaseModel):
     extension: str
     access_mode: File.AccessMode

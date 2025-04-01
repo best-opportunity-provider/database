@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class Error[Code: Enum, Context = None]:
     error_code: Code
     context: Context

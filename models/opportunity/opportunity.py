@@ -33,10 +33,9 @@ class OpportunityProvider(mongo.Document):
         return [provider for provider in cls.objects if provider.name.matches(regex)]
 
     def create(cls, name: ContainedTransString):
-        self = OpportunityProvider(
-            name=name
-        )
+        self = OpportunityProvider(name=name)
         return self.save()
+
 
 class OpportunityProviderModel(pydantic.BaseModel):
     model_config = {
@@ -45,7 +44,7 @@ class OpportunityProviderModel(pydantic.BaseModel):
 
     name: ContainedTransStringModel
     logo: FileModel
-    
+
 
 class OpportunityIndustry(mongo.Document):
     meta = {
@@ -63,10 +62,7 @@ class OpportunityIndustry(mongo.Document):
     def get_all(cls) -> list[Self]:
         return list(cls.objects)
 
-    def update(
-        self,
-        name: ContainedTransString
-    ) -> Self:
+    def update(self, name: ContainedTransString) -> Self:
         self.name = name
         return self.save()
 
@@ -91,14 +87,13 @@ class OpportunityTag(mongo.Document):
 
     @classmethod
     def create(cls, name: ContainedTransString) -> Self:
-        self = OpportunityTag(
-            name=name
-        )
+        self = OpportunityTag(name=name)
         return self.save()
 
     def update(self, name: ContainedTransString) -> Self:
         self.name = name
         return self.save()
+
 
 class OpportunityTagModel(pydantic.BaseModel):
     model_config = {
@@ -106,6 +101,7 @@ class OpportunityTagModel(pydantic.BaseModel):
     }
 
     name: ContainedTransStringModel
+
 
 class OpportunityLanguage(mongo.Document):
     meta = {
@@ -117,7 +113,8 @@ class OpportunityLanguage(mongo.Document):
     @classmethod
     def get_all(cls) -> list[Self]:
         return list(cls.objects)
-    
+
+
 class OpportunityLanguageModel(pydantic.BaseModel):
     model_config = {
         'extra': 'ignore',
@@ -135,6 +132,7 @@ class OpportunitySource(mongo.EmbeddedDocument):
     type = mongo.EnumField(SourceType, required=True)
     link = mongo.StringField(required=True)
 
+
 class OpportunitySourceModel(pydantic.BaseModel):
     model_config = {
         'extra': 'ignore',
@@ -143,6 +141,7 @@ class OpportunitySourceModel(pydantic.BaseModel):
     type: OpportunitySource.SourceType
     link: str
 
+
 class OpportunitySection(mongo.Document):
     meta = {
         'collection': 'opportunity_section',
@@ -150,11 +149,13 @@ class OpportunitySection(mongo.Document):
         'allow_inheritance': True,
     }
 
+
 class OpportunitySectionModel(pydantic.BaseModel):
     model_config = {
         'extra': 'ignore',
     }
-    #TODO: ???
+    # TODO: ???
+
 
 class Opportunity(mongo.Document):
     meta = {
@@ -212,7 +213,7 @@ class Opportunity(mongo.Document):
             sections=sections,
         )
         return self.save()
-    
+
     def update(
         self,
         fallback_language=fallback_language,
@@ -237,7 +238,7 @@ class Opportunity(mongo.Document):
         self.places = places
         self.sections = sections
         return self.save()
-    
+
     def set_logo(self, logo: File) -> Self:
         self.logo = logo
         return self.save()

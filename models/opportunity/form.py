@@ -23,10 +23,12 @@ class FormSubmitMethod(mongo.EmbeddedDocument):
         'allow_inheritance': True,
     }
 
+
 class FormSubmitMethodModel(pydantic.BaseModel):
     model_config = {
         'extra': 'ignore',
     }
+
 
 class YandexFormsSubmitMethod(FormSubmitMethod):
     URL_REGEX = r'^https://forms.yandex.ru/*$'
@@ -43,12 +45,14 @@ class FormField(mongo.EmbeddedDocument):
     label = mongo.EmbeddedDocumentField(TransString, required=True)
     is_required = mongo.BooleanField(required=True)
 
+
 class FormFieldModel(pydantic.BaseModel):
     model_config = {
         'extra': 'ignore',
     }
     label: TransStringModel
     is_required: bool
+
 
 class StringField(FormField):
     class Fill(IntEnum):
@@ -115,6 +119,7 @@ class OpportunityForm(mongo.Document):
     version = mongo.IntField(required=True)  # Used for not showing invalid `OpportunityResponse`s
     submit_method = mongo.EmbeddedDocumentField(FormSubmitMethod)
     fields = mongo.MapField(FormField, required=True)
+
 
 class OpportunityFormModel(pydantic.BaseModel):
     model_config = {
