@@ -3,6 +3,7 @@ from enum import IntEnum
 import re
 import mongoengine as mongo
 import minio
+import pydantic
 
 
 class File(mongo.Document):
@@ -105,3 +106,9 @@ class File(mongo.Document):
             case File.AccessMode.PRIVATE:
                 return self.owner_id == accessor_id
         raise NotImplementedError('Unhandled `File.AccessMode`')
+
+class FileModel(pydantic.BaseModel):
+    extension: str
+    access_mode: File.AccessMode
+    state: File.State
+    bucket: File.Bucket
