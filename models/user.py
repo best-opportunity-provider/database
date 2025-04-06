@@ -1,5 +1,4 @@
 from typing import (
-    Annotated,
     BinaryIO,
     Self,
     Optional,
@@ -17,15 +16,14 @@ from .file import File
 from .utils import Error
 
 
-USERNAME_REGEX = r'^(?!noreply)[A-Za-z\d]{1,30}$'
-EMAIL_REGEX = r'^((?!\.)[\w\-_.]*[^.])(@\w+)(\.\w+(\.\w+)?[^.\W])$'
-PASSWORD_REGEX = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[.\-@$!%*?&])[A-Za-z\d.\-@$!%*?&]*$'
-
-
 class User(mongo.Document):
     meta = {
         'collection': 'user',
     }
+
+    USERNAME_REGEX = r'^(?!noreply)[A-Za-z\d]{1,30}$'
+    EMAIL_REGEX = r'^((?!\.)[\w\-_.]*[^.])(@\w+)(\.\w+(\.\w+)?[^.\W])$'
+    PASSWORD_REGEX = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[.\-@$!%*?&])[A-Za-z\d.\-@$!%*?&]*$'
 
     # We do not use `regex` in following fields, because mongoengine doesn't allow
     # skipping validation and pydantic doesn't support look-arounds by default
@@ -44,40 +42,8 @@ class User(mongo.Document):
     class CreateErrorCode(IntEnum):
         NON_UNIQUE_USERNAME = 0
 
-    class CreateModel(pydantic.BaseModel):
-        model_config = {
-            'extra': 'ignore',
-        }
-
-        # Pydantic doesn't support look-arounds by default, so we check regexes manually
-
-        username: str  # `pattern=USERNAME_REGEX` ommited
-        email: str  # `pattern=EMAIL_REGEX` ommited
-        password: str  # `pattern=PASSWORD_REGEX` ommited
-
-        @pydantic.field_validator('username', mode='after')
-        @classmethod
-        def validate_username(cls, username: str) -> str:
-            if re.match(USERNAME_REGEX, username) is None:
-                raise PydanticCustomError('invalid_pattern', 'Invalid username')
-            return username
-
-        @pydantic.field_validator('email', mode='after')
-        @classmethod
-        def validate_email(cls, email: str) -> str:
-            if re.match(EMAIL_REGEX, email) is None:
-                raise PydanticCustomError('invalid_pattern', 'Invalid email')
-            return email
-
-        @pydantic.field_validator('password', mode='after')
-        @classmethod
-        def validate_password(cls, password: str) -> str:
-            if re.match(PASSWORD_REGEX, password) is None:
-                raise PydanticCustomError('invalid_pattern', 'Invalid password')
-            return password
-
     @classmethod
-    def create(cls, credentials: CreateModel) -> Self | Error[CreateErrorCode]:
+    def create(cls, credentials: 'CreateModel') -> Self | Error[CreateErrorCode]:
         user: User | None = User.objects.filter(username=credentials.username).first()
         if user is not None:
             return Error(cls.CreateErrorCode.NON_UNIQUE_USERNAME)
@@ -89,16 +55,8 @@ class User(mongo.Document):
         UserInfo(user=user).save()
         return user
 
-    class LoginModel(pydantic.BaseModel):
-        model_config = {
-            'extra': 'ignore',
-        }
-
-        username: Annotated[str, pydantic.Field(pattern=USERNAME_REGEX)]
-        password: Annotated[str, pydantic.Field(pattern=PASSWORD_REGEX)]
-
     @classmethod
-    def login(cls, credentials: LoginModel) -> Optional['User']:
+    def login(cls, credentials: 'LoginModel') -> Optional['User']:
         user: User | None = User.objects.filter(username=credentials.username).first()
         if user is None or user.password_hash != cls.hash_password(credentials.password):
             return
@@ -131,6 +89,42 @@ class User(mongo.Document):
         return avatar
 
 
+class LoginModel(pydantic.BaseModel):
+    model_config = {
+        'extra': 'ignore',
+    }
+
+    # Pydantic doesn't support look-arounds by default, so we check regexes manually
+
+    username: str  # `pattern=USERNAME_REGEX` ommited
+    password: str  # `pattern=PASSWORD_REGEX` ommited
+
+    @pydantic.field_validator('username', mode='after')
+    @classmethod
+    def validate_username(cls, username: str) -> str:
+        if re.match(User.USERNAME_REGEX, username) is None:
+            raise PydanticCustomError('invalid_pattern', 'Invalid username')
+        return username
+
+    @pydantic.field_validator('password', mode='after')
+    @classmethod
+    def validate_password(cls, password: str) -> str:
+        if re.match(User.PASSWORD_REGEX, password) is None:
+            raise PydanticCustomError('invalid_pattern', 'Invalid password')
+        return password
+
+
+class CreateModel(LoginModel):
+    email: str  # `pattern=EMAIL_REGEX` ommited
+
+    @pydantic.field_validator('email', mode='after')
+    @classmethod
+    def validate_email(cls, email: str) -> str:
+        if re.match(User.EMAIL_REGEX, email) is None:
+            raise PydanticCustomError('invalid_pattern', 'Invalid email')
+        return email
+
+
 class UserInfo(mongo.Document):
     meta = {
         'collection': 'user_info',
@@ -149,6 +143,15 @@ class UserInfo(mongo.Document):
         name: str | None = None
         surname: str | None = None
         birthday: date | None = None
+
+        @pydantic.model_validator(mode='after')
+        def validate_model(self) -> Self:
+            if len(self.model_fields_set) == 0:
+                raise PydanticCustomError(
+                    'too_short',
+                    'Update model must have at least one explicitly set field',
+                )
+            return self
 
     def _update_name(self, name: str) -> None:
         self.name = name
