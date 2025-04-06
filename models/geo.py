@@ -1,17 +1,15 @@
-import re
-from typing import Self
+from typing import (
+    Literal,
+    Self,
+)
 import mongoengine as mongo
 import pydantic
-from pydantic_core import PydanticCustomError
 
-from .trans_string import (
-    Language,
-)
 from .trans_string.embedded import (
     ContainedTransStringModel,
-    TransString,
     ContainedTransString,
 )
+from .pydantic_base import ObjectId
 
 
 class Country(mongo.Document):
@@ -30,24 +28,6 @@ class Country(mongo.Document):
         return list(cls.objects)
 
 
-class CountryModel(pydantic.BaseModel):
-    model_config = {
-        'extra': 'ignore',
-    }
-    name: ContainedTransStringModel
-    phone_code: str
-    flag_emoji: str
-
-    @pydantic.field_validator('phone_code')
-    def validate_regex(self) -> str:
-        try:
-            re.match(Country.PHONE_CODE_REGEX, self.phone_code)
-        except re.PatternError:
-            raise PydanticCustomError(
-                'pattern_error', 'Phone number should be a valid regular expression'
-            )
-
-
 class City(mongo.Document):
     meta = {
         'collection': 'city',
@@ -59,15 +39,6 @@ class City(mongo.Document):
     @classmethod
     def get_all(cls, regex: str = '*') -> list[Self]:
         return [city for city in cls.objects if city.name.matches(regex)]
-
-
-class CityModel(pydantic.BaseModel):
-    model_config = {
-        'extra': 'ignore',
-    }
-
-    country: CountryModel
-    name: ContainedTransStringModel
 
 
 class Place(mongo.Document):
@@ -82,17 +53,12 @@ class Place(mongo.Document):
     @classmethod
     def create(
         cls,
-        name: str,
-        language: Language,
+        name: ContainedTransString,
         location: Country | City,
     ) -> Self:
-        self = Place(name=ContainedTransString.create(name, language))
-        if isinstance(location, Country):
-            self.country = location
-        elif isinstance(location, City):
-            self.city = location
-            self.country = location.fetch().country
-        return self.save()
+        self = Place()
+        self.update(name, location)
+        return self
 
     @classmethod
     def get_all(cls, regex: str = '*') -> list[Self]:
@@ -112,11 +78,19 @@ class Place(mongo.Document):
         return self.save()
 
 
+class PlaceLocationModel(pydantic.BaseModel):
+    model_config = {
+        'extra': 'ignore',
+    }
+
+    type: Literal['country', 'city']
+    id: ObjectId
+
+
 class PlaceModel(pydantic.BaseModel):
     model_config = {
         'extra': 'ignore',
     }
 
     name: ContainedTransStringModel
-    country: CountryModel
-    city: CityModel
+    location: PlaceLocationModel
