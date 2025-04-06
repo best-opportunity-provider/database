@@ -62,7 +62,7 @@ class TransStringModel(pydantic.BaseModel):
     en: str | None = None
     ru: str | None = None
 
-    @pydantic.model_validator
+    @pydantic.model_validator(mode='after')
     def validate_model(self) -> Self:
         if all(translation is None for translation in (self.en, self.ru)):
             raise PydanticCustomError(
@@ -95,7 +95,7 @@ class ContainedTransString(TransString):
 class ContainedTransStringModel(TransStringModel):
     fallback_language: Language
 
-    @pydantic.model_validator
+    @pydantic.model_validator(mode='after')
     def validate_model(self) -> Self:
         super().validate_model()
         if getattr(self, self.fallback_language) is None:
