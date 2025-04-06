@@ -1,15 +1,20 @@
-from typing import Self
+from typing import (
+    Literal,
+    Self,
+)
 from enum import IntEnum
+
 import mongoengine as mongo
+import pydantic
+from pydantic_core import PydanticCustomError
 
-from formatters import pydantic
-
-from ..file import File, FileModel
+from ..pydantic_base import ObjectId
+from ..utils import Error
+from ..file import File
 from ..trans_string import (
     Language,
 )
 from ..trans_string.embedded import (
-    ContainedTransStringModel,
     TransString,
     ContainedTransString,
     TransStringModel,
@@ -32,18 +37,14 @@ class OpportunityProvider(mongo.Document):
     def get_all(cls, regex: str = '*') -> list[Self]:
         return [provider for provider in cls.objects if provider.name.matches(regex)]
 
-    def create(cls, name: ContainedTransString):
-        self = OpportunityProvider(name=name)
-        return self.save()
+    @classmethod
+    def create(cls, name: ContainedTransString) -> Self:
+        return OpportunityProvider(name=name).save()
 
 
-class OpportunityProviderModel(pydantic.BaseModel):
-    model_config = {
-        'extra': 'ignore',
-    }
-
-    name: ContainedTransStringModel
-    logo: FileModel
+class OpportunityCategory(IntEnum):
+    INTERNSHIP = 0
+    JOB = 1
 
 
 class OpportunityIndustry(mongo.Document):
@@ -54,9 +55,8 @@ class OpportunityIndustry(mongo.Document):
     name = mongo.EmbeddedDocumentField(ContainedTransString, required=True)
 
     @classmethod
-    def create(cls, name: ContainedTransString, language: Language) -> Self:
-        self = OpportunityIndustry(name=ContainedTransString.create(name, language))
-        return self.save()
+    def create(cls, name: ContainedTransString) -> Self:
+        return OpportunityIndustry(name=name).save()
 
     @classmethod
     def get_all(cls) -> list[Self]:
@@ -65,13 +65,6 @@ class OpportunityIndustry(mongo.Document):
     def update(self, name: ContainedTransString) -> Self:
         self.name = name
         return self.save()
-
-
-class OpportunityIndustryModel(pydantic.BaseModel):
-    model_config = {
-        'extra': 'ignore',
-    }
-    name: ContainedTransStringModel
 
 
 class OpportunityTag(mongo.Document):
@@ -87,20 +80,11 @@ class OpportunityTag(mongo.Document):
 
     @classmethod
     def create(cls, name: ContainedTransString) -> Self:
-        self = OpportunityTag(name=name)
-        return self.save()
+        return OpportunityTag(name=name).save()
 
     def update(self, name: ContainedTransString) -> Self:
         self.name = name
         return self.save()
-
-
-class OpportunityTagModel(pydantic.BaseModel):
-    model_config = {
-        'extra': 'ignore',
-    }
-
-    name: ContainedTransStringModel
 
 
 class OpportunityLanguage(mongo.Document):
@@ -114,22 +98,18 @@ class OpportunityLanguage(mongo.Document):
     def get_all(cls) -> list[Self]:
         return list(cls.objects)
 
-
-class OpportunityLanguageModel(pydantic.BaseModel):
-    model_config = {
-        'extra': 'ignore',
-    }
-
-    name: ContainedTransStringModel
+    @classmethod
+    def create(cls, name: ContainedTransString) -> Self:
+        return OpportunityLanguage(name=name).save()
 
 
 class OpportunitySource(mongo.EmbeddedDocument):
-    class SourceType(IntEnum):
+    class Type(IntEnum):
         PROVIDER_WEBSITE = 0
         AGGREGATOR_WEBSITE = 1
         TELEGRAM = 2
 
-    type = mongo.EnumField(SourceType, required=True)
+    type = mongo.EnumField(Type, required=True)
     link = mongo.StringField(required=True)
 
 
@@ -138,8 +118,8 @@ class OpportunitySourceModel(pydantic.BaseModel):
         'extra': 'ignore',
     }
 
-    type: OpportunitySource.SourceType
-    link: str
+    type: OpportunitySource.Type
+    link: pydantic.HttpUrl  # TODO: validate according to `type`
 
 
 class OpportunitySection(mongo.Document):
@@ -150,11 +130,26 @@ class OpportunitySection(mongo.Document):
     }
 
 
-class OpportunitySectionModel(pydantic.BaseModel):
+class MarkdownSection(OpportunitySection):
+    title: TransString
+    content: TransString
+
+    @classmethod
+    def create(cls, title: TransString, content: TransString) -> Self:
+        return MarkdownSection(title=title, content=content).save()
+
+
+class MarkdownSectionModel(pydantic.BaseModel):
     model_config = {
         'extra': 'ignore',
     }
-    # TODO: ???
+
+    type: Literal['markdown']
+    title: TransStringModel
+    content: TransStringModel
+
+
+type OpportunitySectionModels = MarkdownSectionModel
 
 
 class Opportunity(mongo.Document):
@@ -172,6 +167,7 @@ class Opportunity(mongo.Document):
         reverse_delete_rule=mongo.DENY,
         required=True,
     )
+    category = mongo.EnumField(OpportunityCategory, required=True)
     industry = mongo.LazyReferenceField(
         OpportunityIndustry,
         reverse_delete_rule=mongo.DENY,
@@ -187,80 +183,48 @@ class Opportunity(mongo.Document):
     )
 
     @classmethod
-    def create(
-        cls,
-        fallback_language: Language,
-        name: TransString,
-        short_description: TransString,
-        source: OpportunitySource,
-        provider: OpportunityProvider,
-        industry: OpportunityIndustry,
-        tags: list[OpportunityTag],
-        languages: list[OpportunityLanguage],
-        places: list[Place],
-        sections: list[OpportunitySection],
-    ) -> Self:
-        self = Opportunity(
-            fallback_language=fallback_language,
-            name=name,
-            short_description=short_description,
-            source=source,
-            provider=provider,
-            industry=industry,
-            tags=tags,
-            languages=languages,
-            places=places,
-            sections=sections,
-        )
-        return self.save()
+    def create(cls, model: 'CreateModel') -> Self: ...  # TODO
 
-    def update(
-        self,
-        fallback_language=fallback_language,
-        name=name,
-        short_description=short_description,
-        source=source,
-        provider=provider,
-        industry=industry,
-        tags=tags,
-        languages=languages,
-        places=places,
-        sections=sections,
-    ) -> Self:
-        self.fallback_language = fallback_language
-        self.name = name
-        self.short_description = short_description
-        self.source = source
-        self.provider = provider
-        self.industry = industry
-        self.tags = tags
-        self.languages = languages
-        self.places = places
-        self.sections = sections
-        return self.save()
+    def update_tags(self, tags: list[OpportunityTag]) -> None: ...  # TODO
 
-    def set_logo(self, logo: File) -> Self:
-        self.logo = logo
-        return self.save()
+    def update_languages(self, languages: list[OpportunityLanguage]) -> None: ...  # TODO
+
+    def update_places(self, places: list[Place]) -> None: ...  # TODO
+
+    def add_section(self, section_model: OpportunitySectionModels) -> None: ...  # TODO
+
+    def delete_section(self, section_id: ObjectId) -> None: ...  # TODO
+
+    def move_section(self, section_id: ObjectId, new_index: int) -> None: ...  # TODO
 
     @classmethod
     def get_all(cls, regex: str = '*') -> list[Self]:
         return [opportunity for opportunity in cls.objects if opportunity.name.matches(regex)]
 
 
-class OpportunityModel(pydantic.BaseModel):
+class CreateModel(pydantic.BaseModel):
     model_config = {
         'extra': 'ignore',
     }
 
-    translatoions: list[Language]
     fallback_language: Language
     name: TransStringModel
     short_description: TransStringModel
     source: OpportunitySourceModel
-    provider: OpportunityProviderModel
-    industry: OpportunityIndustryModel
-    tags: list[OpportunityTagModel]
-    languages: list[OpportunityLanguageModel]
-    places: list[PlaceModel]
-    sections: list[OpportunitySectionModel]
+    provider: ObjectId
+    category: OpportunityCategory
+    industry: ObjectId
+
+    @pydantic.model_validator(mode='after')
+    def validate_translations(self) -> Self:
+        missing_fields: list[str] = []
+        for field in ('name', 'short_description'):
+            if getattr(getattr(self, field), self.fallback_language.value) is None:
+                missing_fields.append(field)
+        if len(missing_fields) != 0:
+            raise PydanticCustomError(
+                'missing_translations',
+                'Some fields are missing fallback translations',
+                {'fields': missing_fields},
+            )
+        return self
