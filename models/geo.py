@@ -61,7 +61,7 @@ class Place(mongo.Document):
         return self
 
     @classmethod
-    def get_all(cls, regex: str = '*') -> list[Self]:
+    def get_all(cls, regex: str = '.*') -> list[Self]:
         return [place for place in cls.objects if place.name.matches(regex)]
 
     def update(
