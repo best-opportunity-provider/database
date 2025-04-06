@@ -40,8 +40,17 @@ class TransString(mongo.EmbeddedDocument):
 
     @classmethod
     def create(cls, text: str, language: Language) -> Self:
+        """This method is deprecated. Use `create_from_model` instead."""
+
         self = TransString()
         setattr(self, language.value, text)
+        return self
+
+    @classmethod
+    def create_from_model(cls, model: 'TransStringModel') -> Self:
+        self = TransString()
+        for field in model.model_fields_set:
+            setattr(self, field, getattr(model, field))
         return self
 
 
@@ -50,8 +59,17 @@ class TransStringModel(pydantic.BaseModel):
         'extra': 'ignore',
     }
 
-    en: str
-    ru: str
+    en: str | None = None
+    ru: str | None = None
+
+    @pydantic.model_validator
+    def validate_model(self) -> Self:
+        if all(translation is None for translation in (self.en, self.ru)):
+            raise PydanticCustomError(
+                'empty_trans_string',
+                'Translation string should contain at least one translation',
+            )
+        return self
 
 
 class ContainedTransString(TransString):
@@ -66,26 +84,23 @@ class ContainedTransString(TransString):
         setattr(self, language.value, text)
         return self
 
+    @classmethod
+    def create_from_model(cls, model: 'ContainedTransStringModel') -> Self:
+        self = ContainedTransString(fallback_language=model.fallback_language)
+        for field in model.model_fields_set:
+            setattr(self, field, getattr(model, field))
+        return self
 
-class ContainedTransStringModel(pydantic.BaseModel):
-    model_config = {'extra': 'ignore'}
-    en: str
-    ru: str
+
+class ContainedTransStringModel(TransStringModel):
     fallback_language: Language
 
-    @pydantic.field_validator('en', 'ru', mode='after')
-    def validate_language(self) -> Self:
-        if self.fallback_language == Language.ENGLISH:
-            if self.en == '':
-                raise PydanticCustomError(
-                    'fallback_language_error', 'Fallback language should be not empty'
-                )
-        elif self.fallback_language == Language.RUSSIAN:
-            if self.ru == '':
-                raise PydanticCustomError(
-                    'fallback_language_error', 'Fallback language should be not empty'
-                )
-        else:
+    @pydantic.model_validator
+    def validate_model(self) -> Self:
+        super().validate_model()
+        if getattr(self, self.fallback_language) is None:
             raise PydanticCustomError(
-                'fallback_language_error', 'Fallback language should be a valid language'
+                'missing_fallback_translation',
+                'Fallback translation is missing',
             )
+        return self
