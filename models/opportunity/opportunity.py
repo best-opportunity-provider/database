@@ -9,20 +9,14 @@ import pydantic
 from pydantic_core import PydanticCustomError
 
 from ..pydantic_base import ObjectId
-from ..utils import Error
 from ..file import File
-from ..trans_string import (
-    Language,
-)
+from ..trans_string import Language
 from ..trans_string.embedded import (
     TransString,
     ContainedTransString,
     TransStringModel,
 )
-from ..geo import (
-    Place,
-    PlaceModel,
-)
+from ..geo import Place
 
 
 class OpportunityProvider(mongo.Document):
