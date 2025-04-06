@@ -122,7 +122,7 @@ class EmailFieldModel(FormFieldModel):
 
 
 class PhoneNumberField(FormField):
-    whitelist = mongo.ListField(mongo.LazyReferenceField(Country, reverse_delete_rule=mongo.DENY))
+    whitelist = mongo.ListField(mongo.LazyReferenceField(Country))
 
 
 class PhoneNumberFieldModel(FormFieldModel):
@@ -131,7 +131,7 @@ class PhoneNumberFieldModel(FormFieldModel):
 
 
 class ChoiceField(FormField):
-    choices = mongo.MapField(ContainedTransString, required=True)
+    choices = mongo.MapField(mongo.EmbeddedDocumentField(ContainedTransString), required=True)
 
 
 class ChoiceFieldModel(FormFieldModel):
@@ -172,7 +172,7 @@ class IntegerFieldModel(FormFieldModel):
     max: int | None = None
     fill: IntegerField.Fill | None = None
 
-    @pydantic.model_validator
+    @pydantic.model_validator(mode='after')
     def validate_bounds(self) -> Self:
         if self.max < self.min:
             raise PydanticCustomError(
@@ -218,7 +218,7 @@ class OpportunityForm(mongo.Document):
     )
     version = mongo.IntField(required=True)  # Used for not showing outdated `OpportunityResponse`s
     submit_method = mongo.EmbeddedDocumentField(FormSubmitMethod)
-    fields = mongo.MapField(FormField, required=True)
+    fields = mongo.MapField(mongo.EmbeddedDocumentField(FormField), required=True)
 
 
 class OpportunityFormModel(pydantic.BaseModel):
