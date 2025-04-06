@@ -1,4 +1,7 @@
-from typing import Self
+from typing import (
+    Any,
+    Self,
+)
 import mongoengine as mongo
 
 from ..user import User
@@ -16,7 +19,7 @@ class OpportunityFormResponse(mongo.Document):
     data = mongo.DictField(required=True)
 
     @classmethod
-    def create(cls, user: User, form: OpportunityForm, data: dict) -> Self:
+    def create(cls, user: User, form: OpportunityForm, data: dict[str, Any]) -> Self:
         return OpportunityFormResponse(
             user=user,
             form=form,
