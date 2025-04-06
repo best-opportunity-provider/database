@@ -90,6 +90,7 @@ class User(mongo.Document):
 
     def get_avatar(self, minio_client: Minio) -> bytes:
         filename: str = self.avatar.fetch().name if self.avatar is not None else 'default.png'
+        # TODO: perhaps this logic belongs to `File` (add classmethod)
         response = None
         try:
             response = minio_client.get_object('user-avatar', filename)
