@@ -21,7 +21,7 @@ class APIKey(mongo.Document):
     API_KEY_REGEX = r'^(dev|usr)\-[0-9a-f]{64}$'
     PREFIX_TO_TABLE: dict[str, type] = {}  # actual definition at the end of file
 
-    key = mongo.StringField(regex=API_KEY_REGEX, required=True, unique=True)
+    key = mongo.StringField(required=True, unique=True)
     expiry = mongo.DateTimeField(required=True)
 
     @classmethod
@@ -34,9 +34,11 @@ class APIKey(mongo.Document):
     def get(cls, full_key: str) -> Self | None:
         prefix, key = full_key.split('-')
         instance: Self | None = cls.PREFIX_TO_TABLE[prefix].get(key)
+        # for some reason mongoengine do not use tzinfo from database, so we attach it manually
+        expiry = instance.expiry.replace(tzinfo=UTC)
         if instance is None:
             return instance
-        if instance.expiry <= datetime.now(UTC):
+        if expiry <= datetime.now(UTC):
             instance.delete()
             return
         return instance
@@ -54,15 +56,15 @@ class PersonalAPIKey(APIKey):
         if user.id is None:
             # TODO: log message
             raise ValueError("Can't generate personal API key for user without id")
-        instance: Self | None = Self.objects.filter(user=user, ip=str(ip)).first()
+        instance: Self | None = cls.objects.filter(user=user, ip=str(ip)).first()
         if instance is not None:
             instance.delete()
         key = cls.generate_key(f'{user.username}{ip}')
-        return PersonalAPIKey(key=key, expiry=expiry, user=user, ip=str(ip)).save()
+        return cls(key=key, expiry=expiry, user=user, ip=str(ip)).save()
 
     @classmethod
     def get(cls, key: str) -> Self | None:
-        return PersonalAPIKey.objects.filter(key=key).first()
+        return cls.objects.filter(key=key).first()
 
     def __str__(self):
         return f'usr-{self.key}'
@@ -74,11 +76,11 @@ class DeveloperAPIKey(APIKey):
         from random import choice
 
         key = cls.generate_key(''.join([choice('0123456789abcdef') for _ in range(10)]))
-        return DeveloperAPIKey(key=key, expiry=expiry).save()
+        return cls(key=key, expiry=expiry).save()
 
     @classmethod
     def get(cls, key: str) -> Self | None:
-        return DeveloperAPIKey.objects.filter(key=key).first()
+        return cls.objects.filter(key=key).first()
 
     def __str__(self):
         return f'dev-{self.key}'
