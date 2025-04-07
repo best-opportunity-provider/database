@@ -4,6 +4,8 @@ from datetime import (
 )
 from typing import Self
 from ipaddress import IPv4Address
+from enum import IntEnum
+
 import mongoengine as mongo
 
 from .user import (
@@ -18,8 +20,12 @@ class APIKey(mongo.Document):
         'allow_inheritance': True,
     }
 
+    class Category(IntEnum):
+        PERSONAL = 0
+        DEVELOPER = 1
+
     API_KEY_REGEX = r'^(dev|usr)\-[0-9a-f]{64}$'
-    PREFIX_TO_TABLE: dict[str, type] = {}  # actual definition at the end of file
+    PREFIX_TO_TABLE: dict[str, tuple[Category, type]] = {}  # actual definition at the end of file
 
     key = mongo.StringField(required=True, unique=True)
     expiry = mongo.DateTimeField(required=True)
@@ -31,9 +37,12 @@ class APIKey(mongo.Document):
         return sha256(f'{datetime.now()}{salt}'.encode()).hexdigest()[:64]
 
     @classmethod
-    def get(cls, full_key: str) -> Self | None:
+    def get(cls, full_key: str, *, allowed_categories: list[Category] = []) -> Self | None:
         prefix, key = full_key.split('-')
-        instance: Self | None = cls.PREFIX_TO_TABLE[prefix].get(key)
+        category, table = cls.PREFIX_TO_TABLE[prefix]
+        if len(allowed_categories) != 0 and category not in allowed_categories:
+            return
+        instance: Self | None = table.get(key)
         # for some reason mongoengine do not use tzinfo from database, so we attach it manually
         expiry = instance.expiry.replace(tzinfo=UTC)
         if instance is None:
@@ -87,6 +96,6 @@ class DeveloperAPIKey(APIKey):
 
 
 APIKey.PREFIX_TO_TABLE = {
-    'usr': PersonalAPIKey,
-    'dev': DeveloperAPIKey,
+    'usr': (APIKey.Category.PERSONAL, PersonalAPIKey),
+    'dev': (APIKey.Category.DEVELOPER, DeveloperAPIKey),
 }
