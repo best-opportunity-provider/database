@@ -36,20 +36,24 @@ class APIKey(mongo.Document):
 
         return sha256(f'{datetime.now()}{salt}'.encode()).hexdigest()[:64]
 
+    class GetErrorCode(IntEnum):
+        INVALID_CATEGORY = 0
+        INVALID_KEY = 1
+
     @classmethod
-    def get(cls, full_key: str, *, allowed_categories: list[Category] = []) -> Self | None:
+    def get(cls, full_key: str, *, allowed_categories: list[Category] = []) -> Self | GetErrorCode:
         prefix, key = full_key.split('-')
         category, table = cls.PREFIX_TO_TABLE[prefix]
         if len(allowed_categories) != 0 and category not in allowed_categories:
-            return
+            return cls.GetErrorCode.INVALID_CATEGORY
         instance: Self | None = table.get(key)
         # for some reason mongoengine do not use tzinfo from database, so we attach it manually
         expiry = instance.expiry.replace(tzinfo=UTC)
-        if instance is None:
-            return instance
         if expiry <= datetime.now(UTC):
             instance.delete()
-            return
+            instance = None
+        if instance is None:
+            return cls.GetErrorCode.INVALID_KEY
         return instance
 
     def expire(self) -> None:
