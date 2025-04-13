@@ -47,12 +47,12 @@ class APIKey(mongo.Document):
         if len(allowed_categories) != 0 and category not in allowed_categories:
             return cls.GetErrorCode.INVALID_CATEGORY
         instance: Self | None = table.get(key)
+        if instance is None:
+            return cls.GetErrorCode.INVALID_KEY
         # for some reason mongoengine do not use tzinfo from database, so we attach it manually
         expiry = instance.expiry.replace(tzinfo=UTC)
         if expiry <= datetime.now(UTC):
             instance.delete()
-            instance = None
-        if instance is None:
             return cls.GetErrorCode.INVALID_KEY
         return instance
 
