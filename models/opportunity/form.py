@@ -5,6 +5,7 @@ from typing import (
     Self,
     Protocol,
     Optional,
+    TypedDict,
 )
 from enum import IntEnum
 import re
@@ -22,10 +23,10 @@ from ..trans_string.embedded import (
     ContainedTransStringModel,
     Language,
 )
-from ..geo import (
-    Country,
-)
+from ..user import User
+from ..geo import Country
 from .opportunity import Opportunity
+from ..file import File
 
 
 class FormSubmitMethod(mongo.EmbeddedDocument):
@@ -68,6 +69,15 @@ class CreateFieldErrorCode(IntEnum):
     PHONE_NUMBER_INVALID_COUNTRY_ID = 0
 
 
+class PostValidationErrorCode(IntEnum):
+    PHONE_NUMBER_INVALID_COUNTRY_ID = 0
+    PHONE_NUMBER_NON_WHITELIST_COUNTRY = 1
+    INVALID_CHOICE = 2
+    FILE_INVALID_ID = 3
+    FILE_CANT_ACCESS = 4
+    FILE_EXCEEDS_SIZE = 5
+
+
 class FormField(mongo.EmbeddedDocument):
     meta = {
         'abstract': True,
@@ -86,6 +96,11 @@ class FormField(mongo.EmbeddedDocument):
             'label': self.label.get_translation(language),
             'is_required': self.is_required,
         }
+
+    def post_validate_input(
+        self, id: str, input: Any, **kwargs
+    ) -> None | list[Error[PostValidationErrorCode, Any]]:
+        return None
 
 
 class FormFieldModel(pydantic.BaseModel):
@@ -235,6 +250,23 @@ class PhoneNumberField(FormField):
             'whitelist': [str(country.pk) for country in self.whitelist],
         }
 
+    class Input(TypedDict):
+        country_id: ObjectId
+        subscriber_number: str
+
+    def post_validate_input(
+        self, id: str, input: Input, **kwargs
+    ) -> None | list[Error[PostValidationErrorCode, str]]:
+        country: Country | None = Country.objects.with_id(input['country_id'])
+        if country is None:
+            return [Error(PostValidationErrorCode.PHONE_NUMBER_INVALID_COUNTRY_ID, id)]
+        if (
+            self.whitelist is not None
+            and len(self.whitelist) != 0
+            and country not in self.whitelist
+        ):
+            return [Error(PostValidationErrorCode.PHONE_NUMBER_NON_WHITELIST_COUNTRY, id)]
+
 
 class PhoneNumberFieldModel(FormFieldModel):
     type: Literal['phone_number']
@@ -278,6 +310,12 @@ class ChoiceField(FormField):
             'choices': {key: label.get_translation(language) for key, label in self.choices},
         }
 
+    def post_validate_input(
+        self, id: str, input: str | None, **kwargs
+    ) -> None | list[Error[PostValidationErrorCode, str]]:
+        if input is not None and input not in self.choices:
+            return [Error(PostValidationErrorCode.INVALID_CHOICE, id)]
+
 
 class ChoiceFieldModel(FormFieldModel):
     type: Literal['choice']
@@ -303,6 +341,19 @@ class FileField(FormField):
             'type': 'file',
             'max_size_bytes': self.max_size_bytes,
         }
+
+    def post_validate_input(
+        self, id: str, input: ObjectId | None, *, user: User, **kwargs
+    ) -> None | list[Error[PostValidationErrorCode, str]]:
+        if input is None:
+            return
+        file: File | None = File.objects.with_id(input)
+        if file is None or file.state == File.State.MARKED_FOR_DELETION:
+            return [Error(PostValidationErrorCode.FILE_INVALID_ID, id)]
+        if not file.can_access(user.id):
+            return [Error(PostValidationErrorCode.FILE_CANT_ACCESS, id)]
+        if file.size_bytes > self.max_size_bytes:
+            return [Error(PostValidationErrorCode.FILE_EXCEEDS_SIZE, id)]
 
 
 class FileFieldModel(FormFieldModel):
