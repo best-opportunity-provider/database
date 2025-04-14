@@ -30,9 +30,11 @@ class File(mongo.Document):
     }
 
     extension = mongo.StringField(regex=FILE_EXTENSION_REGEX, required=True)
+    size_bytes = mongo.IntField(required=True)
     access_mode = mongo.EnumField(AccessMode, required=True)
     state = mongo.EnumField(State, required=True)
     bucket = mongo.EnumField(Bucket, required=True)
+    owner_id = mongo.ObjectIdField()
 
     @classmethod
     def get_name(cls, object_id: mongo.fields.ObjectId, extension: str) -> str:
@@ -63,18 +65,27 @@ class File(mongo.Document):
             access_mode=access_mode,
             state=cls.State.ALIVE,
             bucket=bucket,
-        ).save()
+        )
+        if size is not None:
+            instance.size_bytes = size
+        instance.save()
         try:
             minio_client.put_object(
                 bucket,
-                cls.get_name(instance.pk, extension),
+                instance.name,
                 file,
                 size if size is not None else -1,
                 part_size=5_242_880,
             )
+            if size is None:
+                write_size = minio_client.stat_object(bucket, instance.name).size
+                assert size is not None
         except minio.S3Error:
             instance.delete()
             return cls.CreateError.S3_UPLOAD_ERROR
+        if size is None:
+            instance.size_bytes = write_size
+            instance.save()
         return instance
 
     def mark_for_deletion(self) -> None:
@@ -104,6 +115,7 @@ class File(mongo.Document):
             case File.AccessMode.PUBLIC:
                 return True
             case File.AccessMode.PRIVATE:
+                assert self.owner_id is not None
                 return self.owner_id == accessor_id
         raise NotImplementedError('Unhandled `File.AccessMode`')
 
