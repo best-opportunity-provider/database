@@ -143,7 +143,7 @@ class MarkdownSectionModel(pydantic.BaseModel):
     content: TransStringModel
 
 
-type OpportunitySectionModels = MarkdownSectionModel
+type OpportunitySectionModels = Annotated[MarkdownSectionModel, Field(discriminator='type')]
 
 
 class Opportunity(mongo.Document):
