@@ -15,8 +15,9 @@ from ..trans_string.embedded import (
     TransString,
     ContainedTransString,
     TransStringModel,
+    ContainedTransStringModel
 )
-from ..geo import Place
+from ..geo import Place, PlaceModel
 
 
 class OpportunityProvider(mongo.Document):
@@ -61,6 +62,14 @@ class OpportunityIndustry(mongo.Document):
         return self.save()
 
 
+class OpportunityIndustryModel(pydantic.BaseModel):
+    model_config = {
+        'extra': 'ignore',
+    }
+
+    name: ContainedTransStringModel
+
+
 class OpportunityTag(mongo.Document):
     meta = {
         'collection': 'opportunity_tag',
@@ -81,6 +90,14 @@ class OpportunityTag(mongo.Document):
         return self.save()
 
 
+class OpportunityTagModel(pydantic.BaseModel):
+    model_config = {
+        'extra': 'ignore',
+    }
+
+    name: ContainedTransStringModel
+
+
 class OpportunityLanguage(mongo.Document):
     meta = {
         'collection': 'opportunity_language',
@@ -95,6 +112,14 @@ class OpportunityLanguage(mongo.Document):
     @classmethod
     def create(cls, name: ContainedTransString) -> Self:
         return OpportunityLanguage(name=name).save()
+
+
+class OpportunityLanguageModel(pydantic.BaseModel):
+    model_config = {
+        'extra': 'ignore',
+    }
+
+    name: ContainedTransStringModel
 
 
 class OpportunitySource(mongo.EmbeddedDocument):
@@ -222,3 +247,21 @@ class CreateModel(pydantic.BaseModel):
                 {'fields': missing_fields},
             )
         return self
+
+
+class UpdateOpportunityModel(pydantic.BaseModel):
+    model_config = {
+        'extra': 'ignore',
+    }
+    
+    fallback_language: Language
+    name: TransStringModel
+    short_description: TransStringModel
+    source: OpportunitySourceModel
+    provider: ObjectId
+    category: OpportunityCategory
+    industry: ObjectId
+    tags: list[OpportunityTagModel]
+    languages: list[OpportunityLanguageModel]
+    places: list[PlaceModel]
+    sections: list[OpportunitySectionModels]
