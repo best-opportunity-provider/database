@@ -8,6 +8,7 @@ import pydantic
 from .trans_string.embedded import (
     ContainedTransStringModel,
     ContainedTransString,
+    Language
 )
 from .pydantic_base import ObjectId
 
@@ -27,6 +28,14 @@ class Country(mongo.Document):
     def get_all(cls) -> list[Self]:
         return list(cls.objects)
 
+    def to_dict(self, language: Language):
+        return {
+            'id': str(self.id),
+            'name': self.name.to_dict(language),
+            'phone_code': str(self.phone_code),
+            'flag_emoji': str(self.flag_emoji)
+        }
+
 
 class City(mongo.Document):
     meta = {
@@ -39,6 +48,13 @@ class City(mongo.Document):
     @classmethod
     def get_all(cls, regex: str = '*') -> list[Self]:
         return [city for city in cls.objects if city.name.matches(regex)]
+
+    def to_dict(self, language: Language):
+        return {
+            'id': str(self.id),
+            'name': self.name.to_dict(language),
+            'country': self.country.to_dict(language)
+        }
 
 
 class Place(mongo.Document):
@@ -53,11 +69,11 @@ class Place(mongo.Document):
     @classmethod
     def create(
         cls,
-        name: ContainedTransString,
-        location: Country | City,
+        name: ContainedTransStringModel,
+        location: 'PlaceLocationModel',
     ) -> Self:
         self = Place()
-        self.update(name, location)
+        self.update(name.to_field(), location.to_field())
         return self
 
     @classmethod
@@ -77,6 +93,17 @@ class Place(mongo.Document):
             self.country = location.fetch().country
         return self.save()
 
+    def to_dict(self, language):
+        t = {
+            'id': str(self.id),
+            'name': self.name.to_dict(language)
+        }
+        if self.city:
+            t['city'] = self.city.to_dict(language)
+        else:
+            t['country'] = self.country.to_dict(language)
+        return t
+
 
 class PlaceLocationModel(pydantic.BaseModel):
     model_config = {
@@ -85,6 +112,11 @@ class PlaceLocationModel(pydantic.BaseModel):
 
     type: Literal['country', 'city']
     id: ObjectId
+
+    def to_field(self):
+        if self.type == 'country':
+            return Country.objects.with_id(self.id)
+        return City.objects.with_id(self.id)
 
 
 class PlaceModel(pydantic.BaseModel):
