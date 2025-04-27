@@ -50,16 +50,23 @@ class OpportunityIndustry(mongo.Document):
     name = mongo.EmbeddedDocumentField(ContainedTransString, required=True)
 
     @classmethod
-    def create(cls, name: ContainedTransString) -> Self:
-        return OpportunityIndustry(name=name).save()
+    def create(cls, name: ContainedTransStringModel) -> Self:
+        print(type(name))
+        return OpportunityIndustry(name=name.to_field()).save()
 
     @classmethod
     def get_all(cls) -> list[Self]:
         return list(cls.objects)
 
-    def update(self, name: ContainedTransString) -> Self:
-        self.name = name
+    def update(self, name: ContainedTransStringModel) -> Self:
+        self.name = name.to_field()
         return self.save()
+
+    def to_dict(self, language: Language):
+        return {
+            'id': str(self.id),
+            'name': self.name.get_translation(language)
+        }
 
 
 class OpportunityIndustryModel(pydantic.BaseModel):
@@ -82,12 +89,18 @@ class OpportunityTag(mongo.Document):
         return list(cls.objects)
 
     @classmethod
-    def create(cls, name: ContainedTransString) -> Self:
-        return OpportunityTag(name=name).save()
+    def create(cls, name: ContainedTransStringModel) -> Self:
+        return OpportunityTag(name=name.to_field()).save()
 
-    def update(self, name: ContainedTransString) -> Self:
-        self.name = name
+    def update(self, name: ContainedTransStringModel) -> Self:
+        self.name = name.to_field()
         return self.save()
+
+    def to_dict(self, language: Language):
+        return {
+            'id': str(self.id),
+            'name': self.name.get_translation(language)
+        }
 
 
 class OpportunityTagModel(pydantic.BaseModel):
@@ -110,8 +123,14 @@ class OpportunityLanguage(mongo.Document):
         return list(cls.objects)
 
     @classmethod
-    def create(cls, name: ContainedTransString) -> Self:
-        return OpportunityLanguage(name=name).save()
+    def create(cls, name: ContainedTransStringModel) -> Self:
+        return OpportunityLanguage(name=name.to_field()).save()
+
+    def to_dict(self, language: Language):
+        return {
+            'id': str(self.id),
+            'name': self.name.get_translation(language)
+        }
 
 
 class OpportunityLanguageModel(pydantic.BaseModel):
@@ -202,19 +221,41 @@ class Opportunity(mongo.Document):
     )
 
     @classmethod
-    def create(cls, model: 'CreateModel') -> Self: ...  # TODO
+    def create(cls, model: 'CreateModel') -> Self:
+        obj = Opportunity(
+            fallback_language=model.fallback_language,
+            name=model.name,
+            short_description=model.short_description,
+            source=model.source,
+            provider=OpportunityProvider.objects.with_id(model.provider),
+            category=model.category,
+            industry=OpportunityIndustry.objects.with_id(model.industry)
+        )
+        return obj.save()
 
-    def update_tags(self, tags: list[OpportunityTag]) -> None: ...  # TODO
+    def update_tags(self, tags: list[OpportunityTag]) -> None:
+        self.tags = tags
 
-    def update_languages(self, languages: list[OpportunityLanguage]) -> None: ...  # TODO
+    def update_languages(self, languages: list[OpportunityLanguage]) -> None:
+        self.languages = languages
 
-    def update_places(self, places: list[Place]) -> None: ...  # TODO
+    def update_places(self, places: list[Place]) -> None:
+        self.places = places
 
-    def add_section(self, section_model: OpportunitySectionModels) -> None: ...  # TODO
+    def add_section(self, section_model: OpportunitySectionModels) -> None:
+        cur = [OpportunitySection(OpportunitySectionModels)]
+        for i in self.sections:
+            cur.append(i)
+        self.sections = cur
 
-    def delete_section(self, section_id: ObjectId) -> None: ...  # TODO
+    def delete_section(self, section_id: ObjectId) -> None:
+        cur = []
+        for i in self.sections:
+            if i.get('_id') != section_id:
+                cur.append(i)
+        self.sections = cur
 
-    def move_section(self, section_id: ObjectId, new_index: int) -> None: ...  # TODO
+    # def move_section(self, section_id: ObjectId, new_index: int) -> None: ...  # TODO
 
     @classmethod
     def get_all(cls, regex: str = '*') -> list[Self]:
