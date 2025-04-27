@@ -16,6 +16,10 @@ from .file import File
 from .utils import Error
 
 
+class UserTier(IntEnum):
+    FREE = 0
+    PAID = 1
+
 class User(mongo.Document):
     meta = {
         'collection': 'user',
@@ -32,6 +36,7 @@ class User(mongo.Document):
     email = mongo.StringField(required=True)  # `regex=EMAIL_REGEX` ommited
     password_hash = mongo.StringField(max_length=256, required=True)
     avatar = mongo.LazyReferenceField(File, reverse_delete_rule=mongo.NULLIFY)
+    tier = mongo.EnumField(UserTier, required=True, default=UserTier.FREE)
 
     @classmethod
     def hash_password(cls, password: str) -> str:
