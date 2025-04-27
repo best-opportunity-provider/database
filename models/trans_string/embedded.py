@@ -71,6 +71,9 @@ class TransStringModel(pydantic.BaseModel):
             )
         return self
 
+    def to_field(self) -> TransString:
+        return TransString(en=self.en, ru=self.ru)
+
 
 class ContainedTransString(TransString):
     """String, that provides translations to a subset of supported languages

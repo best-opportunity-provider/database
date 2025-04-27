@@ -28,14 +28,15 @@ class Country(mongo.Document):
     def get_all(cls) -> list[Self]:
         return list(cls.objects)
 
-    def to_dict(self, language: Language):
-        return {
+    def to_dict(self, language: Language, detailed : bool = True):
+        t = {
             'id': str(self.id),
-            'name': self.name.to_dict(language),
-            'phone_code': str(self.phone_code),
-            'flag_emoji': str(self.flag_emoji)
+            'name': self.name.get_translation(language)
         }
-
+        if detailed:
+            t['phone_code'] = str(self.phone_code)
+            t['flag_emoji'] = str(self.flag_emoji)
+        return t
 
 class City(mongo.Document):
     meta = {
@@ -49,12 +50,14 @@ class City(mongo.Document):
     def get_all(cls, regex: str = '*') -> list[Self]:
         return [city for city in cls.objects if city.name.matches(regex)]
 
-    def to_dict(self, language: Language):
-        return {
+    def to_dict(self, language: Language, detailed : bool = True):
+        t = {
             'id': str(self.id),
-            'name': self.name.to_dict(language),
-            'country': self.country.to_dict(language)
+            'name': self.name.get_translation(language)
         }
+        if detailed:
+            t['country'] = self.country.fetch().to_dict(language, detailed)
+        return t
 
 
 class Place(mongo.Document):
@@ -90,18 +93,18 @@ class Place(mongo.Document):
             self.country = location
         elif isinstance(location, City):
             self.city = location
-            self.country = location.fetch().country
+            self.country = location.country
         return self.save()
 
     def to_dict(self, language):
         t = {
             'id': str(self.id),
-            'name': self.name.to_dict(language)
+            'name': self.name.get_translation(language)
         }
-        if self.city:
-            t['city'] = self.city.to_dict(language)
-        else:
-            t['country'] = self.country.to_dict(language)
+        city = getattr(self, 'city', None)
+        if city:
+            t['city'] = city.fetch().to_dict(language, False)
+        t['country'] = self.country.fetch().to_dict(language, False)
         return t
 
 
