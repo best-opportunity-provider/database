@@ -1,4 +1,6 @@
 from typing import (
+    Annotated,
+    Any,
     Literal,
     Self,
 )
@@ -15,9 +17,9 @@ from ..trans_string.embedded import (
     TransString,
     ContainedTransString,
     TransStringModel,
-    ContainedTransStringModel
+    ContainedTransStringModel,
 )
-from ..geo import Place, PlaceModel
+from ..geo import Place
 
 
 class OpportunityProvider(mongo.Document):
@@ -37,9 +39,10 @@ class OpportunityProvider(mongo.Document):
         return OpportunityProvider(name=name).save()
 
     def to_dict(self, language: Language):
+        # NOTE: logo url is not provided here, since it is set on API level
         return {
             'id': str(self.id),
-            'name': self.name.get_translation(language)
+            'name': self.name.get_translation(language),
         }
 
 
@@ -57,7 +60,6 @@ class OpportunityIndustry(mongo.Document):
 
     @classmethod
     def create(cls, name: ContainedTransStringModel) -> Self:
-        print(type(name))
         return OpportunityIndustry(name=name.to_field()).save()
 
     @classmethod
@@ -69,10 +71,7 @@ class OpportunityIndustry(mongo.Document):
         return self.save()
 
     def to_dict(self, language: Language):
-        return {
-            'id': str(self.id),
-            'name': self.name.get_translation(language)
-        }
+        return {'id': str(self.id), 'name': self.name.get_translation(language)}
 
 
 class OpportunityIndustryModel(pydantic.BaseModel):
@@ -103,10 +102,7 @@ class OpportunityTag(mongo.Document):
         return self.save()
 
     def to_dict(self, language: Language):
-        return {
-            'id': str(self.id),
-            'name': self.name.get_translation(language)
-        }
+        return {'id': str(self.id), 'name': self.name.get_translation(language)}
 
 
 class OpportunityTagModel(pydantic.BaseModel):
@@ -115,9 +111,6 @@ class OpportunityTagModel(pydantic.BaseModel):
     }
 
     name: ContainedTransStringModel
-
-    def to_field(self) -> OpportunityTag:
-        return OpportunityTag(name=name.to_field())
 
 
 class OpportunityLanguage(mongo.Document):
@@ -136,10 +129,7 @@ class OpportunityLanguage(mongo.Document):
         return OpportunityLanguage(name=name.to_field()).save()
 
     def to_dict(self, language: Language):
-        return {
-            'id': str(self.id),
-            'name': self.name.get_translation(language)
-        }
+        return {'id': str(self.id), 'name': self.name.get_translation(language)}
 
 
 class OpportunityLanguageModel(pydantic.BaseModel):
@@ -160,10 +150,7 @@ class OpportunitySource(mongo.EmbeddedDocument):
     link = mongo.StringField(required=True)
 
     def to_dict(self):
-        return {
-            'type': self.type.value,
-            'link': str(self.link)
-        }
+        return {'type': self.type.value, 'link': str(self.link)}
 
 
 class OpportunitySourceModel(pydantic.BaseModel):
@@ -199,7 +186,7 @@ class MarkdownSection(OpportunitySection):
         return {
             'type': 'markdown',
             'title': self.title.get_translation(language),
-            'content': self.content.get_translation(language)
+            'content': self.content.get_translation(language),
         }
 
 
@@ -213,7 +200,9 @@ class MarkdownSectionModel(pydantic.BaseModel):
     content: TransStringModel
 
 
-type OpportunitySectionModels = Annotated[MarkdownSectionModel, Field(discriminator='type')]
+type OpportunitySectionModels = Annotated[
+    MarkdownSectionModel, pydantic.Field(discriminator='type')
+]
 
 
 class Opportunity(mongo.Document):
@@ -246,25 +235,34 @@ class Opportunity(mongo.Document):
         mongo.LazyReferenceField(OpportunitySection, reverse_delete_rule=mongo.NULLIFY)
     )
 
-    def to_dict(self, language: Language):
+    def to_dict(self, language: Language) -> dict[str, Any]:
         return {
             'id': str(self.id),
-            'translations': [i.value for i in self.translations],
-            'fallback_language': self.fallback_language.value,
-            'name': self.name.get_translation(language),
-            'short_description': self.short_description.get_translation(language),
+            'name': self.name.try_get_translation(self.fallback_language, language),
+            'description': self.short_description.try_get_translation(
+                self.fallback_language, language
+            ),
             'source': self.source.to_dict(),
-            'provider': str(self.provider.id),
+            'provider': self.provider.fetch().to_dict(language),
             'category': self.category.value,
-            'industry': str(self.industry.id),
-            'tags': [str(i.id) for i in self.tags],
-            'languages': [str(i.id) for i in self.languages],
-            'places': [str(i.id) for i in self.places],
-            'sections': [str(i.id) for i in self.sections]
+            'industry': self.industry.fetch().to_dict(language),
+            'tags': [tag.fetch().to_dict(language) for tag in self.tags],
+            'places': [place.fetch().to_dict(language) for place in self.places],
+            'languages': [lang.fetch().to_dict(language) for lang in self.languages],
         }
 
     @classmethod
-    def create(cls, translations, fallback_language, name, short_description, source, provider, category, industry) -> Self:
+    def create(
+        cls,
+        translations,
+        fallback_language,
+        name,
+        short_description,
+        source,
+        provider,
+        category,
+        industry,
+    ) -> Self:
         obj = Opportunity(
             translations=translations,
             fallback_language=fallback_language,
@@ -273,16 +271,9 @@ class Opportunity(mongo.Document):
             source=source,
             provider=provider,
             category=category,
-            industry=industry
+            industry=industry,
         )
         return obj.save()
-
-    # provider: ObjectId
-    # industry: ObjectId
-    # tags: list[ObjectId]
-    # languages: list[ObjectId]
-    # places: list[ObjectId]
-    # sections: list[ObjectId]
 
     def update(self, body: 'UpdateOpportunityModel'):
         self.translations = body.translations
@@ -362,7 +353,7 @@ class UpdateOpportunityModel(pydantic.BaseModel):
     model_config = {
         'extra': 'ignore',
     }
-    
+
     translations: list[Language]
     fallback_language: Language
     name: TransStringModel
