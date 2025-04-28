@@ -3,7 +3,6 @@ from enum import IntEnum
 import re
 import mongoengine as mongo
 import minio
-import pydantic
 
 
 class File(mongo.Document):
@@ -25,8 +24,8 @@ class File(mongo.Document):
 
     FILE_EXTENSION_REGEX = r'^[A-Za-z]+(.[A-Za-z]+)*$'
     BUCKET_NAMES = {
-        Bucket.USER_AVATAR: 'user_avatar',
-        Bucket.PROVIDER_LOGO: 'opportunity_provider_logo',
+        Bucket.USER_AVATAR: 'user-avatar',
+        Bucket.PROVIDER_LOGO: 'opportunity-provider-logo',
     }
 
     extension = mongo.StringField(regex=FILE_EXTENSION_REGEX, required=True)
@@ -55,38 +54,44 @@ class File(mongo.Document):
         file: BinaryIO,
         extension: str,
         bucket: Bucket,
-        size: int | None = None,
+        size_bytes: int,
         access_mode: AccessMode = AccessMode.PRIVATE,
     ) -> Self | CreateError:
         if not re.match(cls.FILE_EXTENSION_REGEX, extension):
             return cls.CreateError.INVALID_EXTENSION
         instance: File = File(
             extension=extension,
+            size_bytes=size_bytes,
             access_mode=access_mode,
             state=cls.State.ALIVE,
             bucket=bucket,
         )
-        if size is not None:
-            instance.size_bytes = size
         instance.save()
         try:
             minio_client.put_object(
-                bucket,
+                cls.BUCKET_NAMES[bucket],
                 instance.name,
                 file,
-                size if size is not None else -1,
-                part_size=5_242_880,
+                size_bytes,
             )
-            if size is None:
-                write_size = minio_client.stat_object(bucket, instance.name).size
-                assert size is not None
         except minio.S3Error:
             instance.delete()
             return cls.CreateError.S3_UPLOAD_ERROR
-        if size is None:
-            instance.size_bytes = write_size
-            instance.save()
         return instance
+
+    def download(self, minio_client: minio.Minio) -> bytes:
+        response = None
+        try:
+            response = minio_client.get_object(
+                bucket_name=self.BUCKET_NAMES[self.bucket],
+                object_name=self.name,
+            )
+            file = response.read()
+        finally:
+            if response is not None:
+                response.close()
+                response.release_conn()
+        return file
 
     def mark_for_deletion(self) -> None:
         """Marks file for deletion. After call file is considered to be deleted.
@@ -118,10 +123,3 @@ class File(mongo.Document):
                 assert self.owner_id is not None
                 return self.owner_id == accessor_id
         raise NotImplementedError('Unhandled `File.AccessMode`')
-
-
-class FileModel(pydantic.BaseModel):
-    extension: str
-    access_mode: File.AccessMode
-    state: File.State
-    bucket: File.Bucket

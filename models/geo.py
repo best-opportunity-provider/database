@@ -76,7 +76,7 @@ class Place(mongo.Document):
         location: 'PlaceLocationModel',
     ) -> Self:
         self = Place()
-        self.update(name.to_field(), location.to_field())
+        self.update(name.to_document(), location.to_field())
         return self
 
     @classmethod

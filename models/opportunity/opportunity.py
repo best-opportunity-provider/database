@@ -1,4 +1,6 @@
 from typing import (
+    Annotated,
+    Any,
     Literal,
     Self,
 )
@@ -15,9 +17,9 @@ from ..trans_string.embedded import (
     TransString,
     ContainedTransString,
     TransStringModel,
-    ContainedTransStringModel
+    ContainedTransStringModel,
 )
-from ..geo import Place, PlaceModel
+from ..geo import Place
 
 
 class OpportunityProvider(mongo.Document):
@@ -25,11 +27,13 @@ class OpportunityProvider(mongo.Document):
         'collection': 'opportunity_provider',
     }
 
+    DEFAULT_LOGO: ObjectId = '680f67588142aaa1becf606c'
+
     name = mongo.EmbeddedDocumentField(ContainedTransString, required=True)
     logo = mongo.LazyReferenceField(File, reverse_delete_rule=mongo.NULLIFY)
 
     @classmethod
-    def get_all(cls, regex: str = '*') -> list[Self]:
+    def get_all(cls, regex: str = '') -> list[Self]:
         return [provider for provider in cls.objects if provider.name.matches(regex)]
 
     @classmethod
@@ -37,9 +41,11 @@ class OpportunityProvider(mongo.Document):
         return OpportunityProvider(name=name).save()
 
     def to_dict(self, language: Language):
+        # NOTE: logo url is not provided here, since it is set on API level
         return {
             'id': str(self.id),
-            'name': self.name.get_translation(language)
+            'name': self.name.get_translation(language),
+            'logo': str(self.logo.id) if self.logo is not None else self.DEFAULT_LOGO,
         }
 
 
@@ -56,23 +62,19 @@ class OpportunityIndustry(mongo.Document):
     name = mongo.EmbeddedDocumentField(ContainedTransString, required=True)
 
     @classmethod
-    def create(cls, name: ContainedTransStringModel) -> Self:
-        print(type(name))
-        return OpportunityIndustry(name=name.to_field()).save()
+    def create(cls, name: ContainedTransString) -> Self:
+        return OpportunityIndustry(name=name).save()
 
     @classmethod
     def get_all(cls) -> list[Self]:
         return list(cls.objects)
 
-    def update(self, name: ContainedTransStringModel) -> Self:
-        self.name = name.to_field()
+    def update(self, name: ContainedTransString) -> Self:
+        self.name = name
         return self.save()
 
     def to_dict(self, language: Language):
-        return {
-            'id': str(self.id),
-            'name': self.name.get_translation(language)
-        }
+        return {'id': str(self.id), 'name': self.name.get_translation(language)}
 
 
 class OpportunityIndustryModel(pydantic.BaseModel):
@@ -95,18 +97,15 @@ class OpportunityTag(mongo.Document):
         return list(cls.objects)
 
     @classmethod
-    def create(cls, name: ContainedTransStringModel) -> Self:
-        return OpportunityTag(name=name.to_field()).save()
+    def create(cls, name: ContainedTransString) -> Self:
+        return OpportunityTag(name=name).save()
 
-    def update(self, name: ContainedTransStringModel) -> Self:
-        self.name = name.to_field()
+    def update(self, name: ContainedTransString) -> Self:
+        self.name = name
         return self.save()
 
     def to_dict(self, language: Language):
-        return {
-            'id': str(self.id),
-            'name': self.name.get_translation(language)
-        }
+        return {'id': str(self.id), 'name': self.name.get_translation(language)}
 
 
 class OpportunityTagModel(pydantic.BaseModel):
@@ -115,9 +114,6 @@ class OpportunityTagModel(pydantic.BaseModel):
     }
 
     name: ContainedTransStringModel
-
-    def to_field(self) -> OpportunityTag:
-        return OpportunityTag(name=name.to_field())
 
 
 class OpportunityLanguage(mongo.Document):
@@ -132,14 +128,11 @@ class OpportunityLanguage(mongo.Document):
         return list(cls.objects)
 
     @classmethod
-    def create(cls, name: ContainedTransStringModel) -> Self:
-        return OpportunityLanguage(name=name.to_field()).save()
+    def create(cls, name: ContainedTransString) -> Self:
+        return OpportunityLanguage(name=name).save()
 
     def to_dict(self, language: Language):
-        return {
-            'id': str(self.id),
-            'name': self.name.get_translation(language)
-        }
+        return {'id': str(self.id), 'name': self.name.get_translation(language)}
 
 
 class OpportunityLanguageModel(pydantic.BaseModel):
@@ -160,10 +153,7 @@ class OpportunitySource(mongo.EmbeddedDocument):
     link = mongo.StringField(required=True)
 
     def to_dict(self):
-        return {
-            'type': self.type.value,
-            'link': str(self.link)
-        }
+        return {'type': self.type.value, 'link': str(self.link)}
 
 
 class OpportunitySourceModel(pydantic.BaseModel):
@@ -174,7 +164,7 @@ class OpportunitySourceModel(pydantic.BaseModel):
     type: OpportunitySource.Type
     link: str  # TODO: validate according to `type`
 
-    def to_field(self) -> OpportunitySource:
+    def to_document(self) -> OpportunitySource:
         return OpportunitySource(type=self.type, link=self.link)
 
 
@@ -192,14 +182,14 @@ class MarkdownSection(OpportunitySection):
 
     @classmethod
     def create(cls, title: TransStringModel, content: TransStringModel) -> Self:
-        instance = MarkdownSection(title=title.to_field(), content=content.to_field())
+        instance = MarkdownSection(title=title.to_document(), content=content.to_document())
         return instance.save()
 
     def to_dict(self, language: Language):
         return {
             'type': 'markdown',
             'title': self.title.get_translation(language),
-            'content': self.content.get_translation(language)
+            'content': self.content.get_translation(language),
         }
 
 
@@ -213,14 +203,23 @@ class MarkdownSectionModel(pydantic.BaseModel):
     content: TransStringModel
 
 
-type OpportunitySectionModels = Annotated[MarkdownSectionModel, Field(discriminator='type')]
+type OpportunitySectionModels = Annotated[
+    MarkdownSectionModel, pydantic.Field(discriminator='type')
+]
 
 
 class Opportunity(mongo.Document):
     meta = {
         'collection': 'opportunity',
+        'indexes': [
+            {
+                'fields': ['is_free'],
+                'sparse': True,
+            }
+        ],
     }
 
+    is_free = mongo.BooleanField()
     translations = mongo.ListField(mongo.EnumField(Language), required=True)
     fallback_language = mongo.EnumField(Language, required=True)
     name = mongo.EmbeddedDocumentField(TransString, required=True)
@@ -246,61 +245,74 @@ class Opportunity(mongo.Document):
         mongo.LazyReferenceField(OpportunitySection, reverse_delete_rule=mongo.NULLIFY)
     )
 
-    def section_dict(self, language: Language):
-        return [i.fetch().to_dict(language) for i in self.sections]
-
-    def to_dict(self, language: Language):
+    def to_dict_min(self, language: Language) -> dict[str, Any]:
         return {
             'id': str(self.id),
-            'translations': [i.value for i in self.translations],
-            'fallback_language': self.fallback_language.value,
-            'name': self.name.get_translation(language),
-            'short_description': self.short_description.get_translation(language),
-            'source': self.source.to_dict(),
-            'provider': str(self.provider.id),
+            'name': self.name.try_get_translation(self.fallback_language, language),
+            'provider': self.provider.fetch().to_dict(language),
             'category': self.category.value,
-            'industry': str(self.industry.id),
-            'tags': [str(i.id) for i in self.tags],
-            'languages': [str(i.id) for i in self.languages],
-            'places': [str(i.id) for i in self.places],
-            'sections': [str(i.id) for i in self.sections]
+        }
+
+    def to_dict(self, language: Language) -> dict[str, Any]:
+        return {
+            **self.to_dict_min(language),
+            'description': self.short_description.try_get_translation(
+                self.fallback_language, language
+            ),
+            'source': self.source.to_dict(),
+            'industry': self.industry.fetch().to_dict(language),
+            'tags': [
+                tag.to_dict(language) for tag in OpportunityTag.objects.filter(id__in=self.tags)
+            ],
+            'places': [
+                place.to_dict(language) for place in Place.objects.filter(id__in=self.places)
+            ],
+            'languages': [
+                lang.to_dict(language)
+                for lang in OpportunityLanguage.objects.filter(id__in=self.languages)
+            ],
         }
 
     @classmethod
-    def create(cls, translations, fallback_language, name, short_description, source, provider, category, industry) -> Self:
-        obj = Opportunity(
-            translations=translations,
-            fallback_language=fallback_language,
-            name=name,
-            short_description=short_description,
-            source=source,
-            provider=provider,
-            category=category,
-            industry=industry
+    def create(
+        cls,
+        fallback_language: Language,
+        name: TransString,
+        short_description: TransString,
+        source: OpportunitySource,
+        provider: OpportunityProvider,
+        category: OpportunityCategory,
+        industry: OpportunityIndustry,
+    ) -> Self:
+        self = Opportunity(translations=[fallback_language])
+        self.update(
+            fallback_language,
+            name,
+            short_description,
+            source,
+            provider,
+            category,
+            industry,
         )
-        return obj.save()
+        return self.save()
 
-    # provider: ObjectId
-    # industry: ObjectId
-    # tags: list[ObjectId]
-    # languages: list[ObjectId]
-    # places: list[ObjectId]
-    # sections: list[ObjectId]
-
-    def update(self, body: 'UpdateOpportunityModel'):
-        self.translations = body.translations
-        self.fallback_language = body.fallback_language
-        self.name = body.name.to_field()
-        self.short_description = body.short_description.to_field()
-        self.source = body.source.to_field()
-        self.provider = OpportunityProvider.objects().with_id(body.provider)
-        self.category = body.category
-        self.industry = OpportunityIndustry.objects().with_id(body.industry)
-        self.tags = [OpportunityTag.objects().with_id(i) for i in body.tags]
-        self.languages = [OpportunityLanguage.objects().with_id(i) for i in body.languages]
-        self.places = [Place.objects().with_id(i) for i in body.places]
-        self.sections = [OpportunitySection.objects().with_id(i) for i in body.sections]
-        self.save()
+    def update(
+        self,
+        fallback_language: Language,
+        name: TransString,
+        short_description: TransString,
+        source: OpportunitySource,
+        provider: OpportunityProvider,
+        category: OpportunityCategory,
+        industry: OpportunityIndustry,
+    ) -> None:
+        self.fallback_language = fallback_language
+        self.name = name
+        self.short_description = short_description
+        self.source = source
+        self.provider = provider
+        self.category = category
+        self.industry = industry
 
     def update_tags(self, tags: list[OpportunityTag]) -> None:
         self.tags = tags
@@ -311,19 +323,13 @@ class Opportunity(mongo.Document):
     def update_places(self, places: list[Place]) -> None:
         self.places = places
 
-    def add_section(self, type: str, section_id: ObjectId) -> None:
-        if type == 'markdown':
-            self.sections.append(MarkdownSection.objects().with_id(section_id))
-        else:
-            raise 1
-        self.save()
+    def add_section(self, section: OpportunitySection) -> None:
+        self.sections.append(section)
 
-    def delete_section(self, section_id: ObjectId) -> None:
-        cur = []
-        for i in self.sections:
-            if str(i.id) != section_id:
-                cur.append(i)
-        self.sections = cur
+    def delete_section(self, section: OpportunitySection) -> None:
+        new = [sec for sec in self.sections if sec.id != section.id]
+        self.sections = new
+        section.delete()
 
     # def move_section(self, section_id: ObjectId, new_index: int) -> None: ...  # TODO
 
@@ -338,7 +344,6 @@ class CreateModel(pydantic.BaseModel):
     }
 
     fallback_language: Language
-    translations: list[Language]
     name: TransStringModel
     short_description: TransStringModel
     source: OpportunitySourceModel
@@ -359,22 +364,3 @@ class CreateModel(pydantic.BaseModel):
                 {'fields': missing_fields},
             )
         return self
-
-
-class UpdateOpportunityModel(pydantic.BaseModel):
-    model_config = {
-        'extra': 'ignore',
-    }
-    
-    translations: list[Language]
-    fallback_language: Language
-    name: TransStringModel
-    short_description: TransStringModel
-    source: OpportunitySourceModel
-    provider: ObjectId
-    category: OpportunityCategory
-    industry: ObjectId
-    tags: list[ObjectId]
-    languages: list[ObjectId]
-    places: list[ObjectId]
-    sections: list[ObjectId]
