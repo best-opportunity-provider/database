@@ -27,7 +27,7 @@ class OpportunityProvider(mongo.Document):
         'collection': 'opportunity_provider',
     }
 
-    DEFAULT_LOGO: ObjectId = '680f67588142aaa1becf606c'
+    DEFAULT_LOGO: str = None
 
     name = mongo.EmbeddedDocumentField(ContainedTransString, required=True)
     logo = mongo.LazyReferenceField(File, reverse_delete_rule=mongo.NULLIFY)
@@ -41,6 +41,8 @@ class OpportunityProvider(mongo.Document):
         return OpportunityProvider(name=name).save()
 
     def to_dict(self, language: Language):
+        if self.DEFAULT_LOGO is None:
+            self.DEFAULT_LOGO = str(File.objects.get(default_for=File.Bucket.PROVIDER_LOGO).id)
         # NOTE: logo url is not provided here, since it is set on API level
         return {
             'id': str(self.id),

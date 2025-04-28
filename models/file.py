@@ -8,6 +8,12 @@ import minio
 class File(mongo.Document):
     meta = {
         'collection': 'file',
+        'indexes': [
+            {
+                'fields': ['owner_id'],
+                'sparse': True,
+            },
+        ],
     }
 
     class AccessMode(IntEnum):
@@ -34,6 +40,7 @@ class File(mongo.Document):
     state = mongo.EnumField(State, required=True)
     bucket = mongo.EnumField(Bucket, required=True)
     owner_id = mongo.ObjectIdField()
+    default_for = mongo.EnumField(Bucket, unique=True, sparse=True)
 
     @classmethod
     def get_name(cls, object_id: mongo.fields.ObjectId, extension: str) -> str:
@@ -56,6 +63,7 @@ class File(mongo.Document):
         bucket: Bucket,
         size_bytes: int,
         access_mode: AccessMode = AccessMode.PRIVATE,
+        owner_id: mongo.fields.ObjectId | None = None,
     ) -> Self | CreateError:
         if not re.match(cls.FILE_EXTENSION_REGEX, extension):
             return cls.CreateError.INVALID_EXTENSION
@@ -65,6 +73,7 @@ class File(mongo.Document):
             access_mode=access_mode,
             state=cls.State.ALIVE,
             bucket=bucket,
+            owner_id=owner_id,
         )
         instance.save()
         try:
