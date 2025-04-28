@@ -71,7 +71,7 @@ class TransStringModel(pydantic.BaseModel):
             )
         return self
 
-    def to_field(self) -> TransString:
+    def to_document(self) -> TransString:
         return TransString(en=self.en, ru=self.ru)
 
 
@@ -94,20 +94,17 @@ class ContainedTransString(TransString):
             setattr(self, field, getattr(model, field))
         return self
 
-    def to_dict(self):
-        return {
-            'fallback_language': self.fallback_language.value,
-            'ru': self.ru,
-            'en': self.en
-        }
+    def get_translation(self, language: Language) -> str:
+        return getattr(self, language.value, None) or getattr(self, self.fallback_language)
 
 
 class ContainedTransStringModel(TransStringModel):
     fallback_language: Language
 
-    def to_field(self) -> ContainedTransString:
-        return ContainedTransString(fallback_language=self.fallback_language, en=self.en, ru=self.ru)
-
+    def to_document(self) -> ContainedTransString:
+        return ContainedTransString(
+            fallback_language=self.fallback_language, en=self.en, ru=self.ru
+        )
 
     @pydantic.model_validator(mode='after')
     def validate_model(self) -> Self:
