@@ -238,20 +238,32 @@ class Opportunity(mongo.Document):
         mongo.LazyReferenceField(OpportunitySection, reverse_delete_rule=mongo.NULLIFY)
     )
 
-    def to_dict(self, language: Language) -> dict[str, Any]:
+    def to_dict_min(self, language: Language) -> dict[str, Any]:
         return {
             'id': str(self.id),
             'name': self.name.try_get_translation(self.fallback_language, language),
+            'provider': self.provider.fetch().to_dict(language),
+            'category': self.category.value,
+        }
+
+    def to_dict(self, language: Language) -> dict[str, Any]:
+        return {
+            **self.to_dict_min(language),
             'description': self.short_description.try_get_translation(
                 self.fallback_language, language
             ),
             'source': self.source.to_dict(),
-            'provider': self.provider.fetch().to_dict(language),
-            'category': self.category.value,
             'industry': self.industry.fetch().to_dict(language),
-            'tags': [tag.fetch().to_dict(language) for tag in self.tags],
-            'places': [place.fetch().to_dict(language) for place in self.places],
-            'languages': [lang.fetch().to_dict(language) for lang in self.languages],
+            'tags': [
+                tag.to_dict(language) for tag in OpportunityTag.objects.filter(id__in=self.tags)
+            ],
+            'places': [
+                place.to_dict(language) for place in Place.objects.filter(id__in=self.places)
+            ],
+            'languages': [
+                lang.to_dict(language)
+                for lang in OpportunityLanguage.objects.filter(id__in=self.languages)
+            ],
         }
 
     @classmethod
