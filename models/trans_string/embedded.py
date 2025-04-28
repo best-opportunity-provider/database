@@ -36,7 +36,9 @@ class TransString(mongo.EmbeddedDocument):
     def matches(self, regex: str) -> bool:
         import re
 
-        return any(re.match(regex, field) for field in (self.en, self.ru) if field is not None)
+        return any(
+            re.match(regex, field, re.I) for field in (self.en, self.ru) if field is not None
+        )
 
     @classmethod
     def create(cls, text: str, language: Language) -> Self:
