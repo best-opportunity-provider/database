@@ -245,6 +245,9 @@ class Opportunity(mongo.Document):
         mongo.LazyReferenceField(OpportunitySection, reverse_delete_rule=mongo.NULLIFY)
     )
 
+    def section_dict(self, language: Language):
+        return [i.fetch().to_dict(language) for i in self.sections]
+
     def to_dict_min(self, language: Language) -> dict[str, Any]:
         return {
             'id': str(self.id),
@@ -325,6 +328,7 @@ class Opportunity(mongo.Document):
 
     def add_section(self, section: OpportunitySection) -> None:
         self.sections.append(section)
+        self.save()
 
     def delete_section(self, section: OpportunitySection) -> None:
         new = [sec for sec in self.sections if sec.id != section.id]
