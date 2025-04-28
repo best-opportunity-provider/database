@@ -211,8 +211,15 @@ type OpportunitySectionModels = Annotated[
 class Opportunity(mongo.Document):
     meta = {
         'collection': 'opportunity',
+        'indexes': [
+            {
+                'fields': ['is_free'],
+                'sparse': True,
+            }
+        ],
     }
 
+    is_free = mongo.BooleanField()
     translations = mongo.ListField(mongo.EnumField(Language), required=True)
     fallback_language = mongo.EnumField(Language, required=True)
     name = mongo.EmbeddedDocumentField(TransString, required=True)
