@@ -2,6 +2,7 @@ from typing import (
     BinaryIO,
     Self,
     Optional,
+    Literal,
 )
 from datetime import date
 from enum import IntEnum
@@ -19,6 +20,7 @@ from .utils import Error
 class UserTier(IntEnum):
     FREE = 0
     PAID = 1
+
 
 class User(mongo.Document):
     meta = {
@@ -139,40 +141,24 @@ class UserInfo(mongo.Document):
     name = mongo.StringField()
     surname = mongo.StringField()
     birthday = mongo.DateField()
+    is_male = mongo.BooleanField()
+    phone_number = mongo.StringField()
+    cv = mongo.LazyReferenceField(File)
 
     class UpdateModel(pydantic.BaseModel):
         model_config = {
             'extra': 'ignore',
         }
 
-        name: str | None = None
-        surname: str | None = None
-        birthday: date | None = None
+        name: str
+        surname: str
+        birthday: date
+        gender: Literal['male', 'female']
+        phone_number: str
 
-        @pydantic.model_validator(mode='after')
-        def validate_model(self) -> Self:
-            if len(self.model_fields_set) == 0:
-                raise PydanticCustomError(
-                    'too_short',
-                    'Update model must have at least one explicitly set field',
-                )
-            return self
-
-    def _update_name(self, name: str) -> None:
-        self.name = name
-
-    def _update_surname(self, surname: str) -> None:
-        self.surname = surname
-
-    def _update_birthday(self, birthday: date) -> None:
-        self.birthday = date
-
-    _update_field_handlers = {
-        'name': _update_name,
-        'surname': _update_surname,
-        'birthday': _update_birthday,
-    }
-
-    def update(self, fields: UpdateModel) -> None:
-        for field in fields.model_fields_set:
-            self._update_field_handlers[field](self, getattr(fields, field))
+    def update(self, model: UpdateModel) -> None:
+        self.name = model.name
+        self.surname = model.surname
+        self.birthday = model.birthday
+        self.is_male = (model.gender == 'male')
+        self.phone_number = model.phone_number
