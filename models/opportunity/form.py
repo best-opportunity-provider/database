@@ -7,6 +7,8 @@ from typing import (
     Optional,
     TypedDict,
 )
+from datetime import date
+from dateutil.relativedelta import relativedelta
 from enum import IntEnum
 import re
 
@@ -23,7 +25,10 @@ from ..trans_string.embedded import (
     ContainedTransStringModel,
     Language,
 )
-from ..user import User
+from ..user import (
+    User,
+    UserInfo,
+)
 from ..geo import Country
 from .opportunity import Opportunity
 from ..file import File
@@ -55,7 +60,7 @@ class YandexFormsSubmitMethodModel(pydantic.BaseModel):
         'extra': 'ignore',
     }
 
-    type: Literal['yandex_forms']
+    type: Literal['yandex_forms'] = 'yandex_forms'
     url: Annotated[str, pydantic.Field(pattern=YandexFormsSubmitMethod.URL_REGEX)]
 
     def to_submit_method(self) -> YandexFormsSubmitMethod:
@@ -97,6 +102,9 @@ class FormField(mongo.EmbeddedDocument):
             'is_required': self.is_required,
         }
 
+    def fill_input(self, user: User, user_info: UserInfo) -> tuple[bool, Any]:
+        return False, None
+
     def post_validate_input(
         self, id: str, input: Any, **kwargs
     ) -> None | list[Error[PostValidationErrorCode, Any]]:
@@ -120,6 +128,7 @@ class StringField(FormField):
         FIRST_NAME = 0
         SECOND_NAME = 1
         FULLNAME = 2
+        PHONE_NUMBER = 3
 
     max_length = mongo.IntField(min_value=1)
     fill = mongo.EnumField(Fill)
@@ -132,9 +141,25 @@ class StringField(FormField):
             'max_length': self.max_length,
         }
 
+    def fill_input(self, user: User, user_info: UserInfo) -> tuple[bool, str | None]:
+        match self.fill:
+            case self.Fill.FIRST_NAME:
+                if user_info.name is not None:
+                    return True, user_info.name
+            case self.Fill.SECOND_NAME:
+                if user_info.surname is not None:
+                    return True, user_info.surname
+            case self.Fill.FULLNAME:
+                if user_info.name is not None and user_info.surname is not None:
+                    return True, f'{user_info.name} {user_info.surname}'
+            case self.Fill.PHONE_NUMBER:
+                if user_info.phone_number is not None:
+                    return True, user_info.phone_number
+        return False, None
+
 
 class StringFieldModel(FormFieldModel):
-    type: Literal['string']
+    type: Literal['string'] = 'string'
     max_length: Annotated[int, pydantic.Field(ge=1)] | None = None
     fill: StringField.Fill | None = None
 
@@ -162,7 +187,7 @@ class RegexField(StringField):
 
 
 class RegexFieldModel(StringFieldModel):
-    type: Literal['regex']
+    type: Literal['regex'] = 'regex'
     regex: str
 
     @pydantic.field_validator('regex', mode='after')
@@ -202,7 +227,7 @@ class TextField(FormField):
 
 
 class TextFieldModel(FormFieldModel):
-    type: Literal['text']
+    type: Literal['text'] = 'text'
     max_length: Annotated[int, pydantic.Field(ge=1)] | None = None
 
     def to_field(self, _id: str) -> TextField:
@@ -225,9 +250,12 @@ class EmailField(FormField):
             'max_length': self.max_length,
         }
 
+    def fill_input(self, user: User, user_info: UserInfo) -> tuple[Literal[True], str]:
+        return True, user.email
+
 
 class EmailFieldModel(FormFieldModel):
-    type: Literal['email']
+    type: Literal['email'] = 'email'
     max_length: Annotated[int, pydantic.Field(ge=1)] | None = None
 
     def to_field(self, _id: str) -> EmailField:
@@ -269,7 +297,7 @@ class PhoneNumberField(FormField):
 
 
 class PhoneNumberFieldModel(FormFieldModel):
-    type: Literal['phone_number']
+    type: Literal['phone_number'] = 'phone_number'
     whitelist: Annotated[list[ObjectId], pydantic.Field(min_length=1)] | None = None
 
     def to_field(
@@ -318,7 +346,7 @@ class ChoiceField(FormField):
 
 
 class ChoiceFieldModel(FormFieldModel):
-    type: Literal['choice']
+    type: Literal['choice'] = 'choice'
     choices: Annotated[dict[str, ContainedTransStringModel], pydantic.Field(min_length=1)]
 
     def to_field(self, _id: str) -> ChoiceField:
@@ -332,8 +360,58 @@ class ChoiceFieldModel(FormFieldModel):
         )
 
 
+class GenderField(FormField):
+    MALE_STRING = ContainedTransStringModel(
+        en='Male',
+        ru='Мужской',
+        fallback_language=Language.ENGLISH,
+    ).to_document()
+    FEMALE_STRING = ContainedTransStringModel(
+        en='Female',
+        ru='Женский',
+        fallback_language=Language.ENGLISH,
+    ).to_document()
+
+    male = mongo.StringField(required=True)
+    female = mongo.StringField(required=True)
+
+    def to_dict(self, language: Language) -> dict[str, Any]:
+        return {
+            **super().to_dict(language),
+            'type': 'gender',
+            'male': [self.male, self.MALE_STRING.get_translation(language)],
+            'female': [self.female, self.FEMALE_STRING.get_translation(language)],
+        }
+
+    def fill_input(self, user: User, user_info: UserInfo) -> tuple[bool, str | None]:
+        match user_info.is_male:
+            case True:
+                return True, self.male
+            case False:
+                return True, self.female
+        return False, None
+
+
+class GenderFieldModel(FormFieldModel):
+    type: Literal['gender'] = 'gender'
+    male: str
+    female: str
+
+    def to_field(self, _id: str) -> GenderField:
+        return GenderField(
+            label=self.label.to_document(),
+            is_required=self.is_required,
+            male=self.male,
+            female=self.female,
+        )
+
+
 class FileField(FormField):
+    class Fill(IntEnum):
+        CV = 0
+
     max_size_bytes = mongo.IntField(min_value=1)
+    fill = mongo.EnumField(Fill)
 
     def to_dict(self, language: Language) -> dict[str, Any]:
         return {
@@ -341,6 +419,13 @@ class FileField(FormField):
             'type': 'file',
             'max_size_bytes': self.max_size_bytes,
         }
+
+    def fill_input(self, user: User, user_info: UserInfo) -> tuple[bool, ObjectId | None]:
+        match self.fill:
+            case self.Fill.CV:
+                if user_info.cv is not None:
+                    return True, str(user_info.cv.id)
+        return False, None
 
     def post_validate_input(
         self, id: str, input: ObjectId | None, *, user: User, **kwargs
@@ -357,13 +442,15 @@ class FileField(FormField):
 
 
 class FileFieldModel(FormFieldModel):
-    type: Literal['file']
+    type: Literal['file'] = 'file'
     max_size_bytes: Annotated[int, pydantic.Field(ge=1)] | None = None
+    fill: FileField.Fill | None = None
 
     def to_field(self, _id: str) -> FileField:
         field = FileField(
             label=TransString.create_from_model(self.label),
             is_required=self.is_required,
+            fill=self.fill,
         )
         if self.max_size_bytes is not None:
             field.max_size_bytes = self.max_size_bytes
@@ -382,7 +469,7 @@ class CheckBoxField(FormField):
 
 
 class CheckBoxFieldModel(FormFieldModel):
-    type: Literal['checkbox']
+    type: Literal['checkbox'] = 'checkbox'
     checked_by_default: bool | None = None
 
     def to_field(self, _id: str) -> CheckBoxField:
@@ -412,9 +499,16 @@ class IntegerField(FormField):
             'max': self.max,
         }
 
+    def fill_input(self, user: User, user_info: UserInfo) -> tuple[bool, int | None]:
+        match self.fill:
+            case self.Fill.AGE:
+                if user_info.birthday is not None:
+                    return True, relativedelta(date.today(), user_info.birthday).years
+        return False, None
+
 
 class IntegerFieldModel(FormFieldModel):
-    type: Literal['integer']
+    type: Literal['integer'] = 'integer'
     min: int | None = None
     max: int | None = None
     fill: IntegerField.Fill | None = None
@@ -455,9 +549,16 @@ class DateField(FormField):
             'type': 'date',
         }
 
+    def fill_input(self, user: User, user_info: UserInfo) -> tuple[bool, date | None]:
+        match self.fill:
+            case self.Fill.BIRTHDAY:
+                if user_info.birthday is not None:
+                    return True, user_info.birthday
+        return False, None
+
 
 class DateFieldModel(FormFieldModel):
-    type: Literal['date']
+    type: Literal['date'] = 'date'
     fill: DateField.Fill | None = None
 
     def to_field(self, _id: str) -> DateField:
@@ -477,6 +578,7 @@ FormFieldModels = (
     | EmailFieldModel
     | PhoneNumberFieldModel
     | ChoiceFieldModel
+    | GenderFieldModel
     | FileFieldModel
     | CheckBoxFieldModel
     | IntegerFieldModel
