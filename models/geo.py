@@ -25,8 +25,8 @@ class Country(mongo.Document):
     flag_emoji = mongo.StringField(required=True)
 
     @classmethod
-    def get_all(cls) -> list[Self]:
-        return list(cls.objects)
+    def get_all(cls, regex: str = '') -> list[Self]:
+        return [country for country in cls.objects if country.name.matches(regex)]
 
     def to_dict(self, language: Language, detailed : bool = True):
         t = {
@@ -96,7 +96,7 @@ class Place(mongo.Document):
             self.country = location.country
         return self.save()
 
-    def to_dict(self, language):
+    def to_dict(self, language: Language):
         t = {
             'id': str(self.id),
             'name': self.name.get_translation(language)

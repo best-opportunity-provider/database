@@ -27,11 +27,13 @@ class File(mongo.Document):
     class Bucket(IntEnum):
         USER_AVATAR = 0
         PROVIDER_LOGO = 1
+        USER_CV = 2
 
     FILE_EXTENSION_REGEX = r'^[A-Za-z]+(.[A-Za-z]+)*$'
     BUCKET_NAMES = {
         Bucket.USER_AVATAR: 'user-avatar',
         Bucket.PROVIDER_LOGO: 'opportunity-provider-logo',
+        Bucket.USER_CV: 'user-cv',
     }
 
     extension = mongo.StringField(regex=FILE_EXTENSION_REGEX, required=True)

@@ -267,14 +267,22 @@ class Opportunity(mongo.Document):
             'source': self.source.to_dict(),
             'industry': self.industry.fetch().to_dict(language),
             'tags': [
-                tag.to_dict(language) for tag in OpportunityTag.objects.filter(id__in=self.tags)
+                tag.to_dict(language)
+                for tag in OpportunityTag.objects.filter(
+                    id__in=list(map(lambda tag: str(tag.id), self.tags))
+                )
             ],
             'places': [
-                place.to_dict(language) for place in Place.objects.filter(id__in=self.places)
+                place.to_dict(language)
+                for place in Place.objects.filter(
+                    id__in=list(map(lambda place: str(place.id), self.places))
+                )
             ],
             'languages': [
                 lang.to_dict(language)
-                for lang in OpportunityLanguage.objects.filter(id__in=self.languages)
+                for lang in OpportunityLanguage.objects.filter(
+                    id__in=list(map(lambda lang: str(lang.id), self.languages))
+                )
             ],
         }
 
