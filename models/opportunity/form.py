@@ -437,7 +437,7 @@ class FileField(FormField):
             return [Error(PostValidationErrorCode.FILE_INVALID_ID, id)]
         if not file.can_access(user.id):
             return [Error(PostValidationErrorCode.FILE_CANT_ACCESS, id)]
-        if file.size_bytes > self.max_size_bytes:
+        if self.max_size_bytes is not None and file.size_bytes > self.max_size_bytes:
             return [Error(PostValidationErrorCode.FILE_EXCEEDS_SIZE, id)]
 
 

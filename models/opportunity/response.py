@@ -6,6 +6,7 @@ from datetime import (
     datetime,
     UTC,
 )
+from enum import IntEnum
 
 import mongoengine as mongo
 
@@ -22,11 +23,17 @@ class OpportunityFormResponse(mongo.Document):
         'collection': 'opportunity_form_response',
     }
 
+    class State(IntEnum):
+        UNPROCESSED = 0
+        ERROR = 1
+        PROCESSED = 2
+
     user = mongo.LazyReferenceField(User, reverse_delete_rule=mongo.CASCADE, required=True)
     form = mongo.LazyReferenceField(OpportunityForm, reverse_delete_rule=mongo.NULLIFY)
     form_version = mongo.IntField(required=True)
     data = mongo.DictField(required=True)
     creation_time = mongo.DateTimeField(required=True, default=lambda: datetime.now(UTC))
+    state = mongo.EnumField(State, required=True, default=State.UNPROCESSED)
 
     @classmethod
     def create(
