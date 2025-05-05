@@ -67,7 +67,45 @@ class YandexFormsSubmitMethodModel(pydantic.BaseModel):
         return YandexFormsSubmitMethod(url=self.url)
 
 
-SubmitMethodModels = YandexFormsSubmitMethodModel
+class CrocSubmitMethod(FormSubmitMethod):
+    URL_REGEX = r'^https://careers\.croc\.ru/vacancies/.*$'
+
+    url = mongo.StringField(regex=URL_REGEX, required=True)
+
+
+class CrocSubmitMethodModel(pydantic.BaseModel):
+    model_config = {
+        'extra': 'ignore',
+    }
+
+    type: Literal['croc'] = 'croc'
+    url: Annotated[str, pydantic.Field(pattern=CrocSubmitMethod.URL_REGEX)]
+
+    def to_submit_method(self) -> CrocSubmitMethod:
+        return CrocSubmitMethod(url=self.url)
+
+
+class SuperJobSubmitMethod(FormSubmitMethod):
+    URL_REGEX = r'^https://students\.superjob\.ru/stazhirovki/.*$'
+
+    url = mongo.StringField(regex=URL_REGEX, required=True)
+
+
+class SuperJobSubmitMethodModel(pydantic.BaseModel):
+    model_config = {
+        'extra': 'ignore',
+    }
+
+    type: Literal['superjob'] = 'superjob'
+    url: Annotated[str, pydantic.Field(pattern=SuperJobSubmitMethod.URL_REGEX)]
+
+    def to_submit_method(self) -> SuperJobSubmitMethod:
+        return SuperJobSubmitMethod(url=self.url)
+
+
+SubmitMethodModels = (
+    YandexFormsSubmitMethodModel | CrocSubmitMethodModel | SuperJobSubmitMethodModel
+)
 
 
 class CreateFieldErrorCode(IntEnum):
