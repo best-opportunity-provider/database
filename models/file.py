@@ -104,6 +104,15 @@ class File(mongo.Document):
                 response.release_conn()
         return file
 
+    def download_to_file(self, minio_client: minio.Minio, directory: str, filename: str) -> str:
+        name = f'{directory}/{filename}.{self.extension}'
+        minio_client.fget_object(
+            bucket_name=self.BUCKET_NAMES[self.bucket],
+            object_name=self.name,
+            file_path=name,
+        )
+        return name
+
     def mark_for_deletion(self) -> None:
         """Marks file for deletion. After call file is considered to be deleted.
 
