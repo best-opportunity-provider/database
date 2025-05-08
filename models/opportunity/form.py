@@ -587,11 +587,11 @@ class DateField(FormField):
             'type': 'date',
         }
 
-    def fill_input(self, user: User, user_info: UserInfo) -> tuple[bool, date | None]:
+    def fill_input(self, user: User, user_info: UserInfo) -> tuple[bool, str | None]:
         match self.fill:
             case self.Fill.BIRTHDAY:
                 if user_info.birthday is not None:
-                    return True, user_info.birthday
+                    return True, str(user_info.birthday)
         return False, None
 
 

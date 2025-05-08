@@ -43,7 +43,6 @@ class OpportunityProvider(mongo.Document):
     def to_dict(self, language: Language):
         if self.DEFAULT_LOGO is None:
             self.DEFAULT_LOGO = str(File.objects.get(default_for=File.Bucket.PROVIDER_LOGO).id)
-        # NOTE: logo url is not provided here, since it is set on API level
         return {
             'id': str(self.id),
             'name': self.name.get_translation(language),
