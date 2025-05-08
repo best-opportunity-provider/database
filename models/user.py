@@ -1,5 +1,4 @@
 from typing import (
-    BinaryIO,
     Self,
     Optional,
     Literal,
@@ -9,7 +8,6 @@ from enum import IntEnum
 import re
 
 import mongoengine as mongo
-from minio import Minio
 import pydantic
 from pydantic_core import PydanticCustomError
 
