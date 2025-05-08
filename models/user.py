@@ -31,6 +31,8 @@ class User(mongo.Document):
     EMAIL_REGEX = r'^((?!\.)[\w\-_.]*[^.])(@\w+)(\.\w+(\.\w+)?[^.\W])$'
     PASSWORD_REGEX = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[.\-@$!%*?&])[A-Za-z\d.\-@$!%*?&]*$'
 
+    DEFAULT_AVATAR: str = None
+
     # We do not use `regex` in following fields, because mongoengine doesn't allow
     # skipping validation and pydantic doesn't support look-arounds by default
 
@@ -69,31 +71,15 @@ class User(mongo.Document):
             return
         return user
 
-    def update_avatar(self, minio_client: Minio, file: BinaryIO, extension: str) -> None:
-        avatar = File.create(
-            minio_client,
-            file,
-            extension,
-            File.Bucket.USER_AVATAR,
-            access_mode=File.AccessMode.PUBLIC,
-        )
-        if isinstance(avatar, File.CreateError):
-            raise
-        self.avatar = avatar
-        self.save()
-
-    def get_avatar(self, minio_client: Minio) -> bytes:
-        filename: str = self.avatar.fetch().name if self.avatar is not None else 'default.png'
-        # TODO: perhaps this logic belongs to `File` (add classmethod)
-        response = None
-        try:
-            response = minio_client.get_object('user-avatar', filename)
-            avatar = response.read()
-        finally:
-            if response is not None:
-                response.close()
-                response.release_conn()
-        return avatar
+    def to_dict(self) -> dict[str, str]:
+        if self.DEFAULT_AVATAR is None:
+            self.DEFAULT_AVATAR = str(File.objects.get(default_for=File.Bucket.USER_AVATAR).id)
+        return {
+            'id': str(self.id),
+            'username': self.username,
+            'avatar': str(self.avatar.id) if self.avatar else self.DEFAULT_AVATAR,
+            'filled_info': UserInfo.objects.with_id(self.id).name is not None,
+        }
 
 
 class LoginModel(pydantic.BaseModel):
@@ -160,5 +146,5 @@ class UserInfo(mongo.Document):
         self.name = model.name
         self.surname = model.surname
         self.birthday = model.birthday
-        self.is_male = (model.gender == 'male')
+        self.is_male = model.gender == 'male'
         self.phone_number = model.phone_number
