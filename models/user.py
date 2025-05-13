@@ -97,12 +97,12 @@ class LoginModel(pydantic.BaseModel):
             raise PydanticCustomError('invalid_pattern', 'Invalid username')
         return username
 
-    @pydantic.field_validator('password', mode='after')
-    @classmethod
-    def validate_password(cls, password: str) -> str:
-        if re.match(User.PASSWORD_REGEX, password) is None:
-            raise PydanticCustomError('invalid_pattern', 'Invalid password')
-        return password
+    # @pydantic.field_validator('password', mode='after')
+    # @classmethod
+    # def validate_password(cls, password: str) -> str:
+    #     if re.match(User.PASSWORD_REGEX, password) is None:
+    #         raise PydanticCustomError('invalid_pattern', 'Invalid password')
+    #     return password
 
 
 class CreateModel(LoginModel):
